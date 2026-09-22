@@ -30,6 +30,7 @@ import { useWorkbenchStore } from '@/lib/workbench/session-store';
 import { useWorkbenchPanelState } from '@/lib/workbench/panel-context';
 import { workspaceHref } from '@/lib/workbench/workspace-panes';
 import { exitProPlaybackToStandalone } from '@/lib/workbench/pro-playback-exit';
+import type { ClassroomAudience } from '@/lib/classroom/audience';
 
 /**
  * Stage — top-level classroom container. Standalone classrooms dispatch
@@ -62,9 +63,11 @@ import { exitProPlaybackToStandalone } from '@/lib/workbench/pro-playback-exit';
 export function Stage({
   classroomId,
   onRetryOutline,
+  audience = 'teacher',
 }: {
   classroomId?: string;
   onRetryOutline?: (outlineId: string) => Promise<void>;
+  audience?: ClassroomAudience;
 }) {
   const { mode, setMode, scenes, currentSceneId, generatingOutlines, stage } = useStageStore();
   const router = useRouter();
@@ -354,6 +357,8 @@ export function Stage({
         >
           <PlaybackChromeRoot
             ref={playbackRef}
+            classroomId={classroomId}
+            audience={audience}
             onInteractivePickerChange={setPlaybackInteractivePicker}
             onRetryOutline={onRetryOutline}
             canEnterProMode={workbenchPlayback || isEditable}

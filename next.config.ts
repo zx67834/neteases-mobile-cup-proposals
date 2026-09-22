@@ -3,6 +3,9 @@ import type { NextConfig } from 'next';
 const isVercelBuild = Boolean(process.env.VERCEL);
 
 const nextConfig: NextConfig = {
+  // Allow local development through either loopback hostname. Without this,
+  // Next.js blocks its own dev chunks when the page is opened via 127.0.0.1.
+  allowedDevOrigins: ['127.0.0.1', 'localhost'],
   output: process.env.VERCEL ? undefined : 'standalone',
   outputFileTracingIncludes: {
     '/*': [

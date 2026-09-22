@@ -53,6 +53,7 @@ import {
   shouldResumeClassroomGeneration,
 } from '@/lib/classroom/progressive-load-policy';
 import { useClassroomSession } from '@/lib/classroom/use-classroom-session';
+import type { ClassroomAudience } from '@/lib/classroom/audience';
 
 const log = createLogger('Classroom');
 
@@ -65,9 +66,11 @@ const LOAD_UNAVAILABLE_ERROR = 'load-unavailable';
 export function ClassroomSurface({
   classroomId,
   variant = 'page',
+  audience = 'teacher',
 }: {
   readonly classroomId: string;
   readonly variant?: 'page' | 'pane';
+  readonly audience?: ClassroomAudience;
 }) {
   const { loadFromStorage } = useStageStore();
   const loadedClassroomId = useStageStore((s) => s.stage?.id ?? null);
@@ -492,6 +495,7 @@ export function ClassroomSurface({
           ) : (
             <Stage
               classroomId={classroomId}
+              audience={audience}
               onRetryOutline={mayGenerate ? retrySingleOutline : undefined}
             />
           )}

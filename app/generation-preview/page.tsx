@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
-import { CheckCircle2, Sparkles, AlertCircle, AlertTriangle, ArrowLeft, Bot } from 'lucide-react';
+import { CheckCircle2, Sparkles, AlertCircle, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -11,14 +11,7 @@ import { OutlinesEditor } from '@/components/generation/outlines-editor';
 import { cn } from '@/lib/utils';
 import { useStageStore } from '@/lib/store/stage';
 import { useSettingsStore } from '@/lib/store/settings';
-import { useAgentRegistry } from '@/lib/orchestration/registry/store';
-import {
-  getEnabledProvidersWithVoices,
-  resolveNarratorVoiceForGeneration,
-} from '@/lib/audio/voice-resolver';
-import { isQwenCloneVoice, resolveTTSModelForVoice } from '@/lib/audio/constants';
 import { isTTSProviderEnabled } from '@/lib/audio/provider-enablement';
-import { useAllVoiceProfiles } from '@/lib/audio/voxcpm-voices';
 import { useI18n } from '@/lib/hooks/use-i18n';
 import {
   fetchSceneActions,
@@ -44,14 +37,13 @@ import {
 } from '@/lib/document/bundle';
 import { buildVideoManifestFromOutlines } from '@/lib/media/video-manifest';
 import { nanoid } from 'nanoid';
-import type { GeneratedAgentConfig, Stage } from '@/lib/types/stage';
+import type { Stage } from '@/lib/types/stage';
 import type {
   SceneOutline,
   PdfImage,
   ImageMapping,
   SessionDocumentSource,
 } from '@/lib/types/generation';
-import { AgentRevealModal } from '@/components/agent/agent-reveal-modal';
 import { createLogger } from '@/lib/logger';
 import {
   type GenerationSessionState,
@@ -109,8 +101,6 @@ function GenerationPreviewContent() {
   // streaming card mid-stream, or by restoring a session that was already in review).
   // Combined with `reviewOutlineEnabled` to decide whether the post-stream timer fires.
   const outlineReviewIntentRef = useRef(false);
-  const { profiles: voiceProfiles } = useAllVoiceProfiles();
-
   const [session, setSession] = useState<GenerationSessionState | null>(null);
   const [sessionLoaded, setSessionLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -123,20 +113,7 @@ function GenerationPreviewContent() {
   const [webSearchSources, setWebSearchSources] = useState<Array<{ title: string; url: string }>>(
     [],
   );
-  const [showAgentReveal, setShowAgentReveal] = useState(false);
   const [isConfirmingOutlines, setIsConfirmingOutlines] = useState(false);
-  const [generatedAgents, setGeneratedAgents] = useState<
-    Array<{
-      id: string;
-      name: string;
-      role: string;
-      persona: string;
-      avatar: string;
-      color: string;
-      priority: number;
-    }>
-  >([]);
-  const agentRevealResolveRef = useRef<(() => void) | null>(null);
   const reviewOutlineEnabled = useSettingsStore((s) => s.reviewOutlineEnabled);
   const setReviewOutlineEnabled = useSettingsStore((s) => s.setReviewOutlineEnabled);
 
@@ -732,205 +709,15 @@ function GenerationPreviewContent() {
         stage.name = courseTitle;
       }
 
-      // ── Agent generation (after outlines — uses languageDirective + outlines) ──
+      // This product is used by real teachers with real students. The scene
+      // generator can work without an agent roster, so keep the course free of
+      // virtual teachers, assistants, classmates, and role-card metadata.
       const settings = useSettingsStore.getState();
-      let agents: Array<{
-        id: string;
-        name: string;
-        role: string;
-        persona?: string;
-      }> = [];
-
-      if (settings.agentMode === 'auto') {
-        const agentStepIdx = activeSteps.findIndex((s) => s.id === 'agent-generation');
-        if (agentStepIdx >= 0) setCurrentStepIndex(agentStepIdx);
-
-        try {
-          const allAvatars = [
-            {
-              path: '/avatars/teacher.png',
-              desc: 'Male teacher with glasses, holding a book, green background',
-            },
-            {
-              path: '/avatars/teacher-2.png',
-              desc: 'Female teacher with long dark hair, blue traditional outfit, gentle expression',
-            },
-            {
-              path: '/avatars/assist.png',
-              desc: 'Young female assistant with glasses, pink background, friendly smile',
-            },
-            {
-              path: '/avatars/assist-2.png',
-              desc: 'Young female in orange top and purple overalls, cheerful and approachable',
-            },
-            {
-              path: '/avatars/clown.png',
-              desc: 'Energetic girl with glasses pointing up, green shirt, lively and fun',
-            },
-            {
-              path: '/avatars/clown-2.png',
-              desc: 'Playful girl with curly hair doing rock gesture, blue shirt, humorous vibe',
-            },
-            {
-              path: '/avatars/curious.png',
-              desc: 'Surprised boy with glasses, hand on cheek, curious expression',
-            },
-            {
-              path: '/avatars/curious-2.png',
-              desc: 'Boy with backpack holding a book and question mark bubble, inquisitive',
-            },
-            {
-              path: '/avatars/note-taker.png',
-              desc: 'Studious boy with glasses, blue shirt, calm and organized',
-            },
-            {
-              path: '/avatars/note-taker-2.png',
-              desc: 'Active boy with yellow backpack waving, blue outfit, enthusiastic learner',
-            },
-            {
-              path: '/avatars/thinker.png',
-              desc: 'Thoughtful girl with hand on chin, purple background, contemplative',
-            },
-            {
-              path: '/avatars/thinker-2.png',
-              desc: 'Girl reading a book intently, long dark hair, intellectual and focused',
-            },
-          ];
-
-          const getAvailableVoicesForGeneration = () => {
-            const providers = getEnabledProvidersWithVoices(
-              settings.ttsProvidersConfig,
-              voiceProfiles,
-            );
-            return providers.flatMap((p) =>
-              p.voices.map((v) => {
-                const cloneModelGroup =
-                  p.providerId === 'qwen-tts' && isQwenCloneVoice(v.id)
-                    ? p.modelGroups.find((group) =>
-                        group.voices.some((groupVoice) => groupVoice.id === v.id),
-                      )
-                    : undefined;
-                const modelId = cloneModelGroup
-                  ? resolveTTSModelForVoice(p.providerId, v.id, cloneModelGroup.modelId)
-                  : undefined;
-                return {
-                  providerId: p.providerId,
-                  ...(modelId ? { modelId } : {}),
-                  voiceId: v.id,
-                  voiceName: v.name,
-                  voiceLanguage: v.language,
-                };
-              }),
-            );
-          };
-
-          // The user's global TTS voice is the narrator voice. Pass it along so
-          // the server pins the teacher agent to it instead of letting the LLM
-          // pick a different voice. Reuse the same resolution helpers as the
-          // advertised list: the model follows the voice, and only clones carry
-          // a model on the wire. An unusable global voice (disabled/unconfigured
-          // provider) is NOT pinned — the LLM then picks a working advertised
-          // voice and the narration fallback machinery stays alive.
-          const getNarratorVoiceForGeneration = () =>
-            resolveNarratorVoiceForGeneration(
-              settings.ttsProviderId,
-              settings.ttsVoice,
-              settings.ttsProvidersConfig[settings.ttsProviderId],
-            );
-
-          const agentResp = await fetch('/api/generate/agent-profiles', {
-            method: 'POST',
-            headers: getApiHeaders(),
-            body: JSON.stringify(
-              withThinkingConfig({
-                stageInfo: { name: stage.name, description: stage.description },
-                sceneOutlines: outlines.map((o) => ({
-                  title: o.title,
-                  description: o.description,
-                })),
-                languageDirective,
-                availableAvatars: allAvatars.map((a) => a.path),
-                avatarDescriptions: allAvatars.map((a) => ({ path: a.path, desc: a.desc })),
-                availableVoices: getAvailableVoicesForGeneration(),
-                narratorVoice: getNarratorVoiceForGeneration(),
-              }),
-            ),
-            signal,
-          });
-
-          if (!agentResp.ok) throw new Error('Agent generation failed');
-          const agentData = await agentResp.json();
-          if (!agentData.success) throw new Error(agentData.error || 'Agent generation failed');
-
-          // Embed the roster (including its voice binding) on the stage — it
-          // persists with the stage document via saveToStorage below — and
-          // mirror it into the in-memory registry. The agent-profile LLM has
-          // already bound each agent's voice (from availableVoices); the
-          // fallback for an invalid/unavailable voice is applied later at the
-          // live TTS call.
-          const generatedConfigs = agentData.agents as GeneratedAgentConfig[];
-          stage.generatedAgentConfigs = generatedConfigs;
-          const { applyGeneratedAgentsToRegistry } =
-            await import('@/lib/orchestration/registry/store');
-          const savedIds = applyGeneratedAgentsToRegistry(stage.id, generatedConfigs);
-          settings.setSelectedAgentIds(savedIds);
-          // Stage-derived, not a user choice — must not carry across classrooms.
-          settings.setAgentSelectionIsUserSet(false);
-          stage.agentIds = savedIds;
-
-          // Show card-reveal modal, continue generation once all cards are revealed
-          setGeneratedAgents(agentData.agents);
-          setShowAgentReveal(true);
-          await new Promise<void>((resolve) => {
-            agentRevealResolveRef.current = resolve;
-          });
-
-          agents = savedIds
-            .map((id) => useAgentRegistry.getState().getAgent(id))
-            .filter(Boolean)
-            .map((a) => ({
-              id: a!.id,
-              name: a!.name,
-              role: a!.role,
-              persona: a!.persona,
-            }));
-        } catch (err: unknown) {
-          log.warn('[Generation] Agent generation failed, falling back to presets:', err);
-          const registry = useAgentRegistry.getState();
-          const fallbackIds = settings.selectedAgentIds.filter((id) => {
-            const a = registry.getAgent(id);
-            return a && !a.isGenerated;
-          });
-          agents = fallbackIds
-            .map((id) => registry.getAgent(id))
-            .filter(Boolean)
-            .map((a) => ({
-              id: a!.id,
-              name: a!.name,
-              role: a!.role,
-              persona: a!.persona,
-            }));
-          stage.agentIds = fallbackIds;
-        }
-      } else {
-        // Preset mode — use selected agents (include persona)
-        // Filter out stale generated agent IDs that may linger in settings
-        const registry = useAgentRegistry.getState();
-        const presetAgentIds = settings.selectedAgentIds.filter((id) => {
-          const a = registry.getAgent(id);
-          return a && !a.isGenerated;
-        });
-        agents = presetAgentIds
-          .map((id) => registry.getAgent(id))
-          .filter(Boolean)
-          .map((a) => ({
-            id: a!.id,
-            name: a!.name,
-            role: a!.role,
-            persona: a!.persona,
-          }));
-        stage.agentIds = presetAgentIds;
-      }
+      const agents: Array<{ id: string; name: string; role: string; persona?: string }> = [];
+      settings.setSelectedAgentIds([]);
+      settings.setAgentSelectionIsUserSet(false);
+      stage.agentIds = [];
+      stage.generatedAgentConfigs = [];
 
       // Move to scene generation step
       setStatusMessage('');
@@ -1507,31 +1294,11 @@ function GenerationPreviewContent() {
               >
                 <Sparkles className="size-3 animate-pulse" />
                 {t('generation.aiWorking')}
-                {generatedAgents.length > 0 && !showAgentReveal && (
-                  <button
-                    onClick={() => setShowAgentReveal(true)}
-                    className="ml-2 flex items-center gap-1.5 rounded-full border border-purple-300/30 bg-purple-500/10 px-3 py-1 text-xs font-medium normal-case tracking-normal text-purple-400 transition-colors hover:bg-purple-500/20 hover:text-purple-300"
-                  >
-                    <Bot className="size-3" />
-                    {t('generation.viewAgents')}
-                  </button>
-                )}
               </motion.div>
             ) : null}
           </AnimatePresence>
         </div>
       </div>
-
-      {/* Agent Reveal Modal */}
-      <AgentRevealModal
-        agents={generatedAgents}
-        open={showAgentReveal}
-        onClose={() => setShowAgentReveal(false)}
-        onAllRevealed={() => {
-          agentRevealResolveRef.current?.();
-          agentRevealResolveRef.current = null;
-        }}
-      />
     </div>
   );
 }

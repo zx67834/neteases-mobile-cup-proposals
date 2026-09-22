@@ -1,5 +1,4 @@
-import { ScanLine, Search, Bot, FileText, LayoutPanelLeft, Clapperboard } from 'lucide-react';
-import { useSettingsStore } from '@/lib/store/settings';
+import { ScanLine, Search, FileText, LayoutPanelLeft, Clapperboard } from 'lucide-react';
 import type {
   SceneOutline,
   UserRequirements,
@@ -110,13 +109,6 @@ export const ALL_STEPS: GenerationStep[] = [
     type: 'writing',
   },
   {
-    id: 'agent-generation',
-    title: 'generation.agentGeneration',
-    description: 'generation.agentGenerationDesc',
-    icon: Bot,
-    type: 'writing',
-  },
-  {
     id: 'slide-content',
     title: 'generation.generatingSlideContent',
     description: 'generation.generatingSlideContentDesc',
@@ -141,7 +133,6 @@ export const getActiveSteps = (session: GenerationSessionState | null) => {
       );
     }
     if (step.id === 'web-search') return !!session?.requirements?.webSearch;
-    if (step.id === 'agent-generation') return useSettingsStore.getState().agentMode === 'auto';
     return true;
   });
 };

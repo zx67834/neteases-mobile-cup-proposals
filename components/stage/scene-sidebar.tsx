@@ -4,6 +4,7 @@ import { useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   PanelLeftClose,
+  PanelLeftOpen,
   PieChart,
   Cpu,
   MousePointer2,
@@ -123,6 +124,18 @@ export function SceneSidebar({
         </div>
       )}
 
+      {collapsed && (
+        <button
+          type="button"
+          onClick={() => onCollapseChange(false)}
+          className="absolute left-2 top-1/2 z-50 flex h-12 w-8 -translate-y-1/2 items-center justify-center rounded-xl border border-slate-200 bg-white/95 text-slate-500 shadow-lg shadow-slate-900/10 backdrop-blur transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-600 active:scale-95 dark:border-slate-700 dark:bg-slate-900/95 dark:text-slate-300 dark:hover:border-violet-700 dark:hover:bg-violet-950"
+          aria-label="展开课件目录"
+          title="展开课件目录"
+        >
+          <PanelLeftOpen className="size-4" />
+        </button>
+      )}
+
       <div className={cn('flex flex-col w-full h-full overflow-hidden', collapsed && 'hidden')}>
         {/* Logo Header */}
         <div className="h-10 flex items-center justify-between shrink-0 relative mt-3 mb-1 px-3">
@@ -135,6 +148,8 @@ export function SceneSidebar({
           </button>
           <button
             onClick={() => onCollapseChange(true)}
+            aria-label="收起课件目录"
+            title="收起课件目录"
             className="w-7 h-7 shrink-0 rounded-lg flex items-center justify-center bg-gray-100/80 dark:bg-gray-800/80 text-gray-500 dark:text-gray-400 ring-1 ring-black/[0.04] dark:ring-white/[0.06] hover:bg-gray-200/90 dark:hover:bg-gray-700/90 hover:text-gray-700 dark:hover:text-gray-200 active:scale-90 transition-all duration-200"
           >
             <PanelLeftClose className="w-4 h-4" />

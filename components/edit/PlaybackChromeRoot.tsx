@@ -67,6 +67,8 @@ import {
   getSlideElementTypeLabel,
 } from '@/components/canvas/slide-element-pick-overlay';
 import { shouldClearDraftElementReference } from '@/components/chat/element-reference-receipt';
+import { LiveQuestionBar } from '@/components/classroom/LiveQuestionBar';
+import type { ClassroomAudience } from '@/lib/classroom/audience';
 
 type DraftElementReference = {
   reference: ElementReference;
@@ -95,6 +97,8 @@ export interface PlaybackChromeRootHandle {
 }
 
 interface PlaybackChromeRootProps {
+  readonly classroomId?: string;
+  readonly audience?: ClassroomAudience;
   readonly onRetryOutline?: (outlineId: string) => Promise<void>;
   /** Whether the Pro Switch in Header should be enabled. */
   readonly canEnterProMode?: boolean;
@@ -120,6 +124,8 @@ export const PlaybackChromeRoot = forwardRef<PlaybackChromeRootHandle, PlaybackC
   function PlaybackChromeRoot(
     {
       onRetryOutline,
+      classroomId,
+      audience = 'teacher',
       canEnterProMode,
       onEnterProMode,
       proModeActive,
@@ -182,6 +188,13 @@ export const PlaybackChromeRoot = forwardRef<PlaybackChromeRootHandle, PlaybackC
     const setChatAreaCollapsed = useSettingsStore((s) => s.setChatAreaCollapsed);
     const setTTSMuted = useSettingsStore((s) => s.setTTSMuted);
     const setTTSVolume = useSettingsStore((s) => s.setTTSVolume);
+
+    // Teacher playback opens with the private lecture notes visible. Students
+    // never render that panel, even if the persisted desktop preference says it
+    // was open in a previous teacher session.
+    useEffect(() => {
+      if (audience === 'teacher') setChatAreaCollapsed(false);
+    }, [audience, setChatAreaCollapsed]);
 
     // PlaybackEngine state
     const [engineMode, setEngineMode] = useState<EngineMode>('idle');
@@ -1588,14 +1601,14 @@ export const PlaybackChromeRoot = forwardRef<PlaybackChromeRootHandle, PlaybackC
         }
       : null;
 
-    // Scene viewer height — header is 80px when visible, roundtable is
-    // 192px in playback mode (autonomous hides it). Mode is guaranteed
+    // Scene viewer height — header is 80px when visible and the live-question
+    // strip is 128px in playback mode. Mode is guaranteed
     // non-'edit' here since the parent Stage unmounts this component
     // when entering Pro mode.
     const sceneViewerHeight = (() => {
       const headerHeight = isPresenting || hideHeader ? 0 : 80;
-      const roundtableHeight = mode === 'playback' && !isPresenting ? 192 : 0;
-      return `calc(100% - ${headerHeight + roundtableHeight}px)`;
+      const questionBarHeight = mode === 'playback' && !isPresenting ? 128 : 0;
+      return `calc(100% - ${headerHeight + questionBarHeight}px)`;
     })();
 
     return (
@@ -1699,15 +1712,11 @@ export const PlaybackChromeRoot = forwardRef<PlaybackChromeRootHandle, PlaybackC
             />
           </div>
 
-          {/* Roundtable Area */}
+          {/* The upstream virtual-classmate roundtable remains mounted invisibly
+              for its playback/session bridge. The campus UI replaces it with a
+              real student-question stream below. */}
           {mode === 'playback' && (
-            <div
-              className={cn(
-                'transition-opacity duration-300',
-                !isPresenting && 'shrink-0',
-                isPresenting && 'absolute inset-x-0 bottom-0 z-20',
-              )}
-            >
+            <div className={cn('hidden')}>
               <Roundtable
                 mode={mode}
                 initialParticipants={participants}
@@ -1877,12 +1886,27 @@ export const PlaybackChromeRoot = forwardRef<PlaybackChromeRootHandle, PlaybackC
               />
             </div>
           )}
+
+          {mode === 'playback' && (
+            <div
+              className={cn(
+                !isPresenting && 'shrink-0',
+                isPresenting && 'absolute inset-x-0 bottom-0 z-20',
+              )}
+            >
+              <LiveQuestionBar
+                classroomId={classroomId}
+                audience={audience}
+                overlay={isPresenting}
+              />
+            </div>
+          )}
         </div>
 
         {/* Chat Area — playback / autonomous always renders it here; Pro
           (edit) mode unmounts this whole PlaybackChromeRoot, so the
           edit branch has no chat. */}
-        <div className="flex shrink-0">
+        <div className={cn('flex shrink-0', audience === 'student' && 'hidden')}>
           <ChatArea
             ref={chatAreaRef}
             width={chatAreaWidth}
@@ -1950,6 +1974,9 @@ export const PlaybackChromeRoot = forwardRef<PlaybackChromeRootHandle, PlaybackC
             onStopSession={handleSessionStop}
             onSegmentSealed={discussionTTS.handleSegmentSealed}
             shouldHoldAfterReveal={discussionTTS.shouldHold}
+            lectureOnly={audience === 'teacher'}
+            showLectureNotes={audience === 'teacher'}
+            stageId={classroomId ?? stage?.id}
           />
         </div>
 

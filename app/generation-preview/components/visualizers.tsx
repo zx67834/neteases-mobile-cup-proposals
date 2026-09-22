@@ -38,8 +38,6 @@ export function StepVisualizer({
       return <WebSearchVisualizer sources={webSearchSources || []} />;
     case 'outline':
       return <StreamingOutlineVisualizer outlines={outlines || []} onExpand={onExpandOutline} />;
-    case 'agent-generation':
-      return <AgentGenerationVisualizer />;
     case 'slide-content':
       return <ContentVisualizer />;
     case 'actions':
@@ -383,32 +381,6 @@ function StreamingOutlineVisualizer({
 }
 
 // Content: Cycles through distinct representations of Slides, Quiz, PBL, Interactive
-function AgentGenerationVisualizer() {
-  return (
-    <div className="w-60 h-40 mx-auto flex items-center justify-center">
-      <div className="flex gap-3">
-        {[0, 1, 2].map((i) => (
-          <motion.div
-            key={i}
-            className="w-14 h-20 rounded-lg bg-gradient-to-br from-purple-400 to-blue-500 dark:from-purple-600 dark:to-blue-700 shadow-lg"
-            animate={{ y: [0, -8, 0], rotateZ: [0, 3, -3, 0] }}
-            transition={{
-              duration: 1.5,
-              repeat: Infinity,
-              delay: i * 0.3,
-              ease: 'easeInOut',
-            }}
-          >
-            <div className="w-full h-full flex items-center justify-center text-white/80 text-lg font-bold">
-              ?
-            </div>
-          </motion.div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function ContentVisualizer() {
   const [index, setIndex] = useState(0);
 

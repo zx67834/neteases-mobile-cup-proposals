@@ -37,7 +37,6 @@ import { Textarea as UITextarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { SettingsDialog } from '@/components/settings';
 import { GenerationToolbar } from '@/components/generation/generation-toolbar';
-import { AgentBar } from '@/components/agent/agent-bar';
 import { useTheme } from '@/lib/hooks/use-theme';
 import { nanoid } from 'nanoid';
 import { deleteDocumentBlob, storeDocumentBlob } from '@/lib/utils/image-storage';
@@ -101,6 +100,8 @@ const log = createLogger('Home');
 const WEB_SEARCH_STORAGE_KEY = 'webSearchEnabled';
 const RECENT_OPEN_STORAGE_KEY = 'recentClassroomsOpen';
 const INTERACTIVE_MODE_STORAGE_KEY = 'interactiveModeEnabled';
+const REAL_CLASSROOM_TEACHING_DIRECTIVE =
+  '使用场景是真实教师面向真实学生授课。请生成专业、可编辑的教师课件、讲义和课堂测试；不要设计、介绍或模拟任何虚拟教师、虚拟助教、虚拟同学或角色卡。';
 
 // PPTX import is still scaffolding: `useImportPptx` has no `onImported` consumer
 // yet, so the flow only logs the parsed slides. Hide the entry point behind a
@@ -606,7 +607,7 @@ function HomePage() {
     try {
       const userProfile = useUserProfileStore.getState();
       const requirements: UserRequirements = {
-        requirement: form.requirement,
+        requirement: `${form.requirement.trim()}\n\n${REAL_CLASSROOM_TEACHING_DIRECTIVE}`,
         userNickname: userProfile.nickname || undefined,
         userBio: userProfile.bio || undefined,
         webSearch: form.webSearch || undefined,
@@ -876,12 +877,9 @@ function HomePage() {
             data-pro-morph="composer"
             className="w-full rounded-2xl border border-border/60 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-xl shadow-black/[0.03] dark:shadow-black/20 transition-shadow focus-within:shadow-2xl focus-within:shadow-violet-500/[0.06]"
           >
-            {/* ── Greeting + Profile + Agents ── */}
-            <div className="relative z-20 flex items-start justify-between">
+            {/* ── Greeting + Profile ── */}
+            <div className="relative z-20 flex items-start">
               <GreetingBar />
-              <div className="pr-3 pt-3.5 shrink-0">
-                <AgentBar />
-              </div>
             </div>
 
             {/* Textarea */}

@@ -10,8 +10,8 @@
     "close": "关闭"
   },
   "home": {
-    "slogan": "Generative Learning in Multi-Agent Interactive Classroom",
-    "greetingWithName": "嗨，{{name}}"
+    "slogan": "面向真实课堂的 AI 教学工作台",
+    "greetingWithName": "你好，{{name}}"
   },
   "toolbar": {
     "pdfParser": "解析器",
@@ -1986,7 +1986,7 @@
   },
   "profile": {
     "title": "个人资料",
-    "defaultNickname": "同学",
+    "defaultNickname": "教师",
     "chooseAvatar": "选择头像",
     "uploadAvatar": "上传",
     "bioPlaceholder": "介绍一下自己，AI老师会根据你的背景个性化教学...",
