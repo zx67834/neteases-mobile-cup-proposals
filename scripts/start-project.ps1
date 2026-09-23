@@ -1,6 +1,8 @@
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $projectRoot
+$postgresPort = 55432
+$env:POSTGRES_PORT = [string]$postgresPort
 
 function Wait-ForExit {
     Write-Host ''
@@ -45,7 +47,7 @@ function Start-Postgres {
     do {
         $tcpClient = [System.Net.Sockets.TcpClient]::new()
         try {
-            $tcpClient.Connect('127.0.0.1', 54329)
+            $tcpClient.Connect('127.0.0.1', $postgresPort)
             return
         } catch {
             Start-Sleep -Seconds 1
@@ -53,7 +55,7 @@ function Start-Postgres {
             $tcpClient.Dispose()
         }
     } while ((Get-Date) -lt $deadline)
-    throw 'PostgreSQL started but did not become ready on port 54329.'
+    throw "PostgreSQL started but did not become ready on port $postgresPort."
 }
 
 $tcpClient = [System.Net.Sockets.TcpClient]::new()
