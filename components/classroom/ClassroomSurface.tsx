@@ -456,7 +456,7 @@ export function ClassroomSurface({
                 <p className="text-lg font-medium">{t('classroom.notFound')}</p>
                 <p className="text-sm text-muted-foreground">{t('classroom.notFoundDesc')}</p>
                 <Link
-                  href="/"
+                  href={audience === 'student' ? '/student' : '/teacher'}
                   className="mt-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
                 >
                   {t('classroom.backToHome')}

@@ -9,6 +9,25 @@ afterEach(() => {
 });
 
 describe('resolveRequestOwnerId', () => {
+  it('uses an explicitly configured shared local owner across browsers', () => {
+    vi.stubEnv('OPENMAIC_SHARED_OWNER_ID', 'local:teacher');
+    const responseHeaders = new Headers();
+
+    expect(resolveRequestOwnerId(new Request('http://localhost/agent'), responseHeaders)).toBe(
+      'local:teacher',
+    );
+    expect(responseHeaders.has('set-cookie')).toBe(false);
+  });
+
+  it('prefers an authenticated owner over the shared local owner', () => {
+    vi.stubEnv('OPENMAIC_SHARED_OWNER_ID', 'local:teacher');
+    const responseHeaders = new Headers();
+
+    expect(
+      resolveRequestOwnerId(new Request('http://localhost/agent'), responseHeaders, 'user-42'),
+    ).toBe('user-42');
+  });
+
   it('mints a UUID-backed anonymous owner when the cookie is absent', () => {
     const responseHeaders = new Headers();
 

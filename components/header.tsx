@@ -29,6 +29,8 @@ interface HeaderProps {
   readonly hideGlobalControls?: boolean;
   /** Hide course-level share/export in a workbench-attached classroom. */
   readonly hideCourseActions?: boolean;
+  /** Role-specific home used by standalone teacher/student classrooms. */
+  readonly homeHref?: '/teacher' | '/student';
 }
 
 export function Header({
@@ -41,6 +43,7 @@ export function Header({
   hideBackControl,
   hideGlobalControls,
   hideCourseActions,
+  homeHref,
 }: HeaderProps) {
   const { t } = useI18n();
   const router = useRouter();
@@ -55,7 +58,9 @@ export function Header({
             ? null
             : (backControl ?? (
                 <button
-                  onClick={() => exitClassroom(router, searchParams)}
+                  onClick={() =>
+                    homeHref ? router.push(homeHref) : exitClassroom(router, searchParams)
+                  }
                   className="shrink-0 p-2 rounded-lg text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
                   title={exitLabel}
                   aria-label={exitLabel}

@@ -41,6 +41,8 @@ import type { FolderRecord } from '@/lib/utils/database';
 import { NewFolderDialog } from '@/components/discovery/folder-dialogs';
 import { useImportClassroom } from '@/lib/import/use-import-classroom';
 import { createCoalescedLatestLoader } from '@/lib/workbench/course-discovery-sync';
+import { isBrowserPersistenceEnabled } from '@/lib/persistence/bootstrap';
+import { migrateBrowserCoursesToServer } from '@/lib/persistence/migrate-browser-courses';
 
 const log = createLogger('HomeDiscovery');
 
@@ -189,7 +191,26 @@ export function useHomeDiscovery({
     useMediaGenerationStore.getState().revokeObjectUrls();
     useMediaGenerationStore.setState({ tasks: {} });
 
-    void Promise.all([loadClassrooms(), loadFolders()]);
+    const migrateThenLoad = async () => {
+      if (isBrowserPersistenceEnabled()) {
+        try {
+          const result = await migrateBrowserCoursesToServer();
+          if (result.migrated > 0) {
+            toast.success(`已将 ${result.migrated} 门本地课程同步到 PostgreSQL`);
+          }
+          if (result.failed > 0 || result.missingAssets > 0) {
+            toast.warning(
+              `课程同步完成，但有 ${result.failed} 门课程或 ${result.missingAssets} 个素材未能同步`,
+            );
+          }
+        } catch (error) {
+          log.error('Failed to migrate browser courses:', error);
+          toast.error('本地课程暂未同步，浏览器中的原数据仍然保留');
+        }
+      }
+      await Promise.all([loadClassrooms(), loadFolders()]);
+    };
+    void migrateThenLoad();
 
     const onAuthChange = () => {
       void loadClassrooms();

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef, useDeferredValue } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowUp,
@@ -94,6 +94,8 @@ import {
   readLastWorkspaceSessionId,
   workspaceResumeHref,
 } from '@/lib/workbench/workspace-session-memory';
+import { isBrowserPersistenceEnabled } from '@/lib/persistence/bootstrap';
+import { migrateBrowserCoursesToServer } from '@/lib/persistence/migrate-browser-courses';
 
 const log = createLogger('Home');
 
@@ -131,6 +133,8 @@ function HomePage() {
   const { t } = useI18n();
   const { theme, setTheme } = useTheme();
   const router = useRouter();
+  const pathname = usePathname();
+  const classroomBasePath = pathname.startsWith('/teacher') ? '/teacher/classroom' : '/classroom';
   // Do not replay the classic hero's entrance after the route handoff already
   // carried the lockup and composer into place.
   const [swapped] = useState(arrivedByProSwap);
@@ -344,7 +348,26 @@ function HomePage() {
     // Read sessionStorage on the client only (avoids SSR hydration mismatch).
     // Both reads resolve before flipping `hydrated`, so the hero layout does
     // not thrash as each lands independently.
-    void Promise.all([loadClassrooms(), loadFolders()]).finally(() => setHydrated(true));
+    const migrateThenLoad = async () => {
+      if (isBrowserPersistenceEnabled()) {
+        try {
+          const result = await migrateBrowserCoursesToServer();
+          if (result.migrated > 0) {
+            toast.success(`已将 ${result.migrated} 门本地课程同步到 PostgreSQL`);
+          }
+          if (result.failed > 0 || result.missingAssets > 0) {
+            toast.warning(
+              `课程同步完成，但有 ${result.failed} 门课程或 ${result.missingAssets} 个素材未能同步`,
+            );
+          }
+        } catch (err) {
+          log.error('Failed to migrate browser courses:', err);
+          toast.error('本地课程暂未同步，浏览器中的原数据仍然保留');
+        }
+      }
+      await Promise.all([loadClassrooms(), loadFolders()]);
+    };
+    void migrateThenLoad().finally(() => setHydrated(true));
 
     return () => {
       revokeThumbnailSlideMediaUrls(thumbnailsRef.current);
@@ -1299,7 +1322,7 @@ function HomePage() {
                               confirmingDelete={pendingDeleteId === classroom.id}
                               onConfirmDelete={() => confirmDelete(classroom.id)}
                               onCancelDelete={() => setPendingDeleteId(null)}
-                              onClick={() => router.push(`/classroom/${classroom.id}`)}
+                              onClick={() => router.push(`${classroomBasePath}/${classroom.id}`)}
                               overlay={
                                 <>
                                   <MoveToFolderMenu
@@ -1890,5 +1913,23 @@ function ClassroomCard({
 }
 
 export default function Page() {
+  const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (pathname === '/') router.replace('/teacher');
+  }, [pathname, router]);
+
+  // The root route is reserved for the real sign-in screen. Until the auth
+  // module lands, keep old bookmarks working by handing them to the teacher
+  // home instead of presenting a fake role-switcher as a login experience.
+  if (pathname === '/') {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-6 w-6 animate-spin text-violet-500" aria-label="正在进入教师端" />
+      </main>
+    );
+  }
+
   return <HomePage />;
 }

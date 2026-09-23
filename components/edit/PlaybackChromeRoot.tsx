@@ -68,7 +68,10 @@ import {
 } from '@/components/canvas/slide-element-pick-overlay';
 import { shouldClearDraftElementReference } from '@/components/chat/element-reference-receipt';
 import { LiveQuestionBar } from '@/components/classroom/LiveQuestionBar';
+import { TeacherSlideControls } from '@/components/classroom/TeacherSlideControls';
+import { StudentClassroomAssistant } from '@/components/student/StudentClassroomAssistant';
 import type { ClassroomAudience } from '@/lib/classroom/audience';
+import { getScenePagerState } from '@/lib/edit/scene-pager';
 
 type DraftElementReference = {
   reference: ElementReference;
@@ -153,6 +156,10 @@ export const PlaybackChromeRoot = forwardRef<PlaybackChromeRootHandle, PlaybackC
     const generationComplete = useStageStore.use.generationComplete();
 
     const currentScene = getCurrentScene();
+    const scenePager = useMemo(
+      () => getScenePagerState(scenes, currentSceneId),
+      [currentSceneId, scenes],
+    );
     const piChatEnabled = isPiChatEnabled();
     const coursewareReferenceEnabled = isCoursewareReferenceEnabled();
     const [elementPickActive, setElementPickActiveState] = useState(false);
@@ -1485,15 +1492,29 @@ export const PlaybackChromeRoot = forwardRef<PlaybackChromeRootHandle, PlaybackC
 
         switch (event.key) {
           case 'ArrowLeft':
-            if (!isPresenting) return;
+          case 'PageUp':
+            if (!isPresenting && audience !== 'teacher') return;
             event.preventDefault();
             handlePreviousScene();
             resetPresentationIdleTimer();
             break;
           case 'ArrowRight':
-            if (!isPresenting) return;
+          case 'PageDown':
+            if (!isPresenting && audience !== 'teacher') return;
             event.preventDefault();
             handleNextScene();
+            resetPresentationIdleTimer();
+            break;
+          case 'Home':
+            if (audience !== 'teacher' || scenes.length === 0) return;
+            event.preventDefault();
+            void gatedSceneSwitch(scenes[0].id);
+            resetPresentationIdleTimer();
+            break;
+          case 'End':
+            if (audience !== 'teacher' || scenes.length === 0) return;
+            event.preventDefault();
+            void gatedSceneSwitch(scenes[scenes.length - 1].id);
             resetPresentationIdleTimer();
             break;
           case ' ':
@@ -1544,15 +1565,18 @@ export const PlaybackChromeRoot = forwardRef<PlaybackChromeRootHandle, PlaybackC
       window.addEventListener('keydown', onKeyDown);
       return () => window.removeEventListener('keydown', onKeyDown);
     }, [
+      audience,
       chatSessionType,
       chatAreaCollapsed,
       handleNextScene,
       handlePlayPause,
       handlePreviousScene,
+      gatedSceneSwitch,
       isPresenting,
       isPresentationInteractionActive,
       isPresentationShortcutTarget,
       resetPresentationIdleTimer,
+      scenes,
       setChatAreaCollapsed,
       setSidebarCollapsed,
       setTTSMuted,
@@ -1646,6 +1670,7 @@ export const PlaybackChromeRoot = forwardRef<PlaybackChromeRootHandle, PlaybackC
               hideBackControl={hideHeaderBackControl}
               hideGlobalControls={hideHeaderGlobalControls}
               hideCourseActions={hideHeaderCourseActions}
+              homeHref={audience === 'student' ? '/student' : '/teacher'}
             />
           )}
 
@@ -1710,6 +1735,20 @@ export const PlaybackChromeRoot = forwardRef<PlaybackChromeRootHandle, PlaybackC
                   : undefined
               }
             />
+            {audience === 'teacher' && scenePager && (
+              <TeacherSlideControls
+                scenes={scenes}
+                currentIndex={scenePager.index}
+                onSelect={(sceneId) => {
+                  void gatedSceneSwitch(sceneId);
+                }}
+                onPrevious={handlePreviousScene}
+                onNext={handleNextScene}
+                isPresenting={isPresenting}
+                controlsVisible={controlsVisible}
+                onTogglePresentation={togglePresentation}
+              />
+            )}
           </div>
 
           {/* The upstream virtual-classmate roundtable remains mounted invisibly
@@ -1902,6 +1941,15 @@ export const PlaybackChromeRoot = forwardRef<PlaybackChromeRootHandle, PlaybackC
             </div>
           )}
         </div>
+
+        {audience === 'student' && (classroomId || stage?.id) ? (
+          <StudentClassroomAssistant
+            courseId={(classroomId || stage?.id)!}
+            sceneId={currentSceneId}
+            sceneTitle={currentScene?.title}
+            sceneOrder={currentScene?.order}
+          />
+        ) : null}
 
         {/* Chat Area — playback / autonomous always renders it here; Pro
           (edit) mode unmounts this whole PlaybackChromeRoot, so the
