@@ -164,17 +164,8 @@ const NODE_THEME: Record<
 };
 
 function LearningNode({ data, selected, width }: NodeProps<StudentFlowNode>) {
-  const {
-    node,
-    sources,
-    busy,
-    aiOpen,
-    onAction,
-    onEdit,
-    onOpenSource,
-    onToggleSize,
-    onToggleAi,
-  } = data;
+  const { node, sources, busy, aiOpen, onAction, onEdit, onOpenSource, onToggleSize, onToggleAi } =
+    data;
   const [answer, setAnswer] = useState(node.studentAnswer ?? '');
   const [showHint, setShowHint] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
@@ -477,7 +468,9 @@ function layoutWorkflowNodes(
   });
 }
 
-function defaultWorkflowConnections(workflow: StudentLearningWorkflow): StudentWorkflowConnection[] {
+function defaultWorkflowConnections(
+  workflow: StudentLearningWorkflow,
+): StudentWorkflowConnection[] {
   return workflow.nodes.flatMap((node) =>
     node.parentId
       ? [
@@ -731,14 +724,7 @@ export function StudentLearningWorkspace({
         : [],
     // handleNodeAction reads the latest workflow and selected course from this render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [
-      workflow,
-      expandingNodeId,
-      activeAiNodeId,
-      router,
-      selectedCourseId,
-      toggleNoteNodeSize,
-    ],
+    [workflow, expandingNodeId, activeAiNodeId, router, selectedCourseId, toggleNoteNodeSize],
   );
   const flowEdges = useMemo(() => (workflow ? workflowEdges(workflow) : []), [workflow]);
 
@@ -832,8 +818,7 @@ export function StudentLearningWorkspace({
         );
     requestedWorkflowRestoredRef.current = true;
     const latest =
-      requested ??
-      savedMemoriesRef.current.find((memory) => memory.courseId === selectedCourseId);
+      requested ?? savedMemoriesRef.current.find((memory) => memory.courseId === selectedCourseId);
     if (latest) restoreMemory(latest);
     // restoreMemory intentionally runs once when a course becomes active.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1098,7 +1083,7 @@ export function StudentLearningWorkspace({
               <GitBranch className="h-4 w-4" />
               <span>
                 {databaseConnected
-                  ? '以“匿名学生”身份保存到数据库，并按课程归入我的笔记'
+                  ? '以当前学生账号保存到数据库，并按课程归入“我的笔记”'
                   : '数据库暂不可用，已保存在本机浏览器并等待同步'}
               </span>
             </div>
@@ -1141,7 +1126,7 @@ export function StudentLearningWorkspace({
                 {databaseSaving
                   ? '正在保存到数据库…'
                   : databaseConnected
-                    ? '已保存到数据库 · 匿名学生'
+                    ? '已保存到数据库 · 当前学生账号'
                     : '已保存到浏览器 · 等待数据库'}
                 <span className="text-slate-300 dark:text-slate-600">·</span>
                 拖动节点与连接点调整链路 · 选中连线按 Delete 删除

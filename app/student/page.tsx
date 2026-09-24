@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 
 import { SlideThumbnail } from '@/components/slide-renderer/SlideThumbnail';
 import { AccountDock } from '@/components/auth/AccountDock';
+import { listStudentCampusCourses } from '@/lib/campus/course-client';
 import { useTheme } from '@/lib/hooks/use-theme';
 import { hydrateStudentWorkflowMemories } from '@/lib/student-workflow/remote-storage';
 import {
@@ -85,16 +86,7 @@ export default function StudentHomePage() {
   }, []);
 
   async function fetchCourses(): Promise<StageListItem[]> {
-    const response = await fetch('/api/campus/courses', { cache: 'no-store' });
-    const payload = (await response.json().catch(() => ({}))) as {
-      success?: boolean;
-      records?: StageListItem[];
-      error?: string;
-    };
-    if (!response.ok || !payload.success || !Array.isArray(payload.records)) {
-      throw new Error(payload.error || '课程列表加载失败');
-    }
-    return payload.records;
+    return listStudentCampusCourses();
   }
 
   useEffect(() => {

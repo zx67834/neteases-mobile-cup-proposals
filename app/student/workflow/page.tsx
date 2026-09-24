@@ -6,8 +6,9 @@ import { ArrowLeft, GraduationCap, Moon, Sun } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { StudentLearningWorkspace } from '@/components/student/StudentLearningWorkspace';
+import { listStudentCampusCourses } from '@/lib/campus/course-client';
 import { useTheme } from '@/lib/hooks/use-theme';
-import { listStages, type StageListItem } from '@/lib/utils/stage-storage';
+import type { StageListItem } from '@/lib/utils/stage-storage';
 
 export default function StudentWorkflowPage() {
   const { theme, setTheme } = useTheme();
@@ -19,7 +20,7 @@ export default function StudentWorkflowPage() {
 
     async function loadCourses() {
       try {
-        const records = await listStages();
+        const records: StageListItem[] = await listStudentCampusCourses();
         if (!cancelled) setCourses(records);
       } catch (error) {
         console.error('[StudentWorkflow] Failed to load courses', error);
