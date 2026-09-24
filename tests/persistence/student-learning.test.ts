@@ -52,18 +52,10 @@ describe('student learning persistence', () => {
   });
 
   it('stores and lists the anonymous student workflow by course', async () => {
-    await upsertStudentLearningWorkflow(
-      db as unknown as Queryable,
-      ANONYMOUS_STUDENT_ID,
-      record(),
-    );
+    await upsertStudentLearningWorkflow(db as unknown as Queryable, ANONYMOUS_STUDENT_ID, record());
 
     await expect(
-      listStudentLearningWorkflows(
-        db as unknown as Queryable,
-        ANONYMOUS_STUDENT_ID,
-        'course-1',
-      ),
+      listStudentLearningWorkflows(db as unknown as Queryable, ANONYMOUS_STUDENT_ID, 'course-1'),
     ).resolves.toEqual([record()]);
   });
 

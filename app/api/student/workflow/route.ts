@@ -37,13 +37,7 @@ type WorkflowBody = {
 };
 
 const intents = new Set<StudentLearningIntent>(['question', 'practice', 'note']);
-const actions = new Set<StudentWorkflowAction>([
-  'explain',
-  'practice',
-  'note',
-  'grade',
-  'explore',
-]);
+const actions = new Set<StudentWorkflowAction>(['explain', 'practice', 'note', 'grade', 'explore']);
 
 function parseIntent(value: unknown): StudentLearningIntent | null {
   return typeof value === 'string' && intents.has(value as StudentLearningIntent)

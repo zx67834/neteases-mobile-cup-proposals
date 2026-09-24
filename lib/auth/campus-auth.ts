@@ -129,7 +129,7 @@ export async function registerCampusUser(input: {
   const userKey = `campus:${input.role}:${randomBytes(18).toString('base64url')}`;
   const result = await pool.query<CampusUserRow>(
     `INSERT INTO campus_users (id, username, password_hash, display_name, role, user_key)
-     VALUES ($1, $2, crypt($3, gen_salt('bf', 12)), $4, $5, $6)
+     VALUES ($1, $2, public.crypt($3, public.gen_salt('bf', 12)), $4, $5, $6)
      RETURNING id, username, display_name, role, user_key`,
     [id, input.username, input.password, input.displayName, input.role, userKey],
   );
@@ -153,7 +153,7 @@ export async function verifyCampusCredentials(
        FROM campus_users
       WHERE lower(username) = lower($1)
         AND is_active = TRUE
-        AND password_hash = crypt($2, password_hash)
+        AND password_hash = public.crypt($2, password_hash)
       LIMIT 1`,
     [username, password],
   );

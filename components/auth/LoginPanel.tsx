@@ -192,14 +192,6 @@ export function LoginPanel() {
                 {mode === 'login' ? '登录并进入工作台' : '创建账号'}
               </button>
             </form>
-
-            {mode === 'login' ? (
-              <div className="mt-6 rounded-2xl bg-slate-50 p-4 text-xs leading-6 text-slate-500">
-                演示账号：teacher_demo / student_demo / admin_demo
-                <br />
-                统一密码：Demo@123456
-              </div>
-            ) : null}
           </div>
         </div>
       </section>

@@ -1,7 +1,7 @@
 import type { Queryable } from '@openmaic/storage/document/pg';
 
 const CAMPUS_SCHEMA_STATEMENTS = [
-  `CREATE EXTENSION IF NOT EXISTS pgcrypto`,
+  `CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public`,
   `CREATE TABLE IF NOT EXISTS campus_users (
     id TEXT PRIMARY KEY,
     username TEXT NOT NULL,
@@ -138,23 +138,8 @@ const CAMPUS_SCHEMA_STATEMENTS = [
     GROUP BY c.id, u.id`,
 ];
 
-const DEMO_USERS = [
-  ['user_teacher_demo', 'teacher_demo', '演示教师', 'teacher', 'campus:teacher:demo'],
-  ['user_student_demo', 'student_demo', '演示学生', 'student', 'campus:student:demo'],
-  ['user_admin_demo', 'admin_demo', '演示管理员', 'admin', 'campus:admin:demo'],
-] as const;
-
 export async function ensureCampusSchema(queryable: Queryable): Promise<void> {
   for (const statement of CAMPUS_SCHEMA_STATEMENTS) {
     await queryable.query(statement);
-  }
-
-  for (const [id, username, displayName, role, userKey] of DEMO_USERS) {
-    await queryable.query(
-      `INSERT INTO campus_users (id, username, password_hash, display_name, role, user_key)
-       VALUES ($1, $2, crypt('Demo@123456', gen_salt('bf', 12)), $3, $4, $5)
-       ON CONFLICT DO NOTHING`,
-      [id, username, displayName, role, userKey],
-    );
   }
 }
