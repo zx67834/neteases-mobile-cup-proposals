@@ -1,4 +1,5 @@
 import { resolveRequestOwnerId } from './owner';
+import { getCampusSessionFromRequest } from '@/lib/auth/campus-auth';
 
 /**
  * Resolve the anonymous owner identity and run a handler with its response
@@ -14,11 +15,12 @@ export async function withRequestOwnerId(
   handler: (ownerId: string, responseHeaders: Headers) => Promise<Response>,
 ): Promise<Response> {
   const responseHeaders = new Headers();
-  const ownerId = resolveRequestOwnerId(req, responseHeaders);
+  const session = await getCampusSessionFromRequest(req);
+  const ownerId = resolveRequestOwnerId(req, responseHeaders, session?.userKey);
   try {
     return await handler(ownerId, responseHeaders);
   } catch (error) {
-    console.error('[agent-runtime] request failed under an anonymous owner', error);
+    console.error('[agent-runtime] request failed under an owner', error);
     return new Response('Internal Server Error', { status: 500, headers: responseHeaders });
   }
 }

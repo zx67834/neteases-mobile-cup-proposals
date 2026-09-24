@@ -14,6 +14,7 @@ import { resolveAssetQuotaBytes } from '@/lib/persistence/asset-quota';
 import { ensureOwnerMaterialSchema } from '@/lib/persistence/owner-materials';
 import { ensureStageMetaSchema } from '@/lib/persistence/stage-meta';
 import { ensureStudentLearningSchema } from '@/lib/persistence/student-learning';
+import { ensureCampusSchema } from '@/lib/persistence/campus-schema';
 import { APP_RUNTIME_PAYLOAD_VALIDATORS } from '@/lib/runtime/payload-validators';
 
 export type PersistencePoolFactory = (connectionString: string) => Pool;
@@ -53,6 +54,7 @@ async function createServerPersistenceProvider(
   try {
     await ensureSchema(queryable);
     await ensureDocumentSchema(queryable);
+    await ensureCampusSchema(queryable);
     await ensureStageMetaSchema(queryable);
     await ensureOwnerMaterialSchema(queryable);
     await ensureStudentLearningSchema(queryable);

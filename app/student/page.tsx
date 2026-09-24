@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Clock3,
   GraduationCap,
+  KeyRound,
   Loader2,
   Moon,
   NotebookPen,
@@ -20,6 +21,7 @@ import type { Slide } from '@openmaic/dsl';
 import { toast } from 'sonner';
 
 import { SlideThumbnail } from '@/components/slide-renderer/SlideThumbnail';
+import { AccountDock } from '@/components/auth/AccountDock';
 import { useTheme } from '@/lib/hooks/use-theme';
 import { hydrateStudentWorkflowMemories } from '@/lib/student-workflow/remote-storage';
 import {
@@ -28,7 +30,6 @@ import {
 } from '@/lib/student-workflow/storage';
 import {
   getFirstSlideByStages,
-  listStages,
   revokeThumbnailSlideMediaUrls,
   type StageListItem,
 } from '@/lib/utils/stage-storage';
@@ -69,13 +70,39 @@ export default function StudentHomePage() {
   const [notesLoading, setNotesLoading] = useState(true);
   const [notesInDatabase, setNotesInDatabase] = useState(false);
   const [query, setQuery] = useState('');
+  const [displayName, setDisplayName] = useState('同学');
+  const [inviteCode, setInviteCode] = useState('');
+  const [joining, setJoining] = useState(false);
+
+  useEffect(() => {
+    const sharedCode = new URLSearchParams(window.location.search).get('join')?.trim();
+    if (!sharedCode) return;
+    setInviteCode(sharedCode.toUpperCase());
+    window.setTimeout(() => {
+      document.getElementById('student-courses')?.scrollIntoView({ behavior: 'smooth' });
+      toast.info('课堂码已填入，点击“加入”即可同步老师发布的课程');
+    }, 250);
+  }, []);
+
+  async function fetchCourses(): Promise<StageListItem[]> {
+    const response = await fetch('/api/campus/courses', { cache: 'no-store' });
+    const payload = (await response.json().catch(() => ({}))) as {
+      success?: boolean;
+      records?: StageListItem[];
+      error?: string;
+    };
+    if (!response.ok || !payload.success || !Array.isArray(payload.records)) {
+      throw new Error(payload.error || '课程列表加载失败');
+    }
+    return payload.records;
+  }
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadCourses() {
       try {
-        const records = await listStages();
+        const records = await fetchCourses();
         const nextThumbnails = await getFirstSlideByStages(records.map((course) => course.id));
         if (cancelled) {
           revokeThumbnailSlideMediaUrls(nextThumbnails);
@@ -99,6 +126,15 @@ export default function StudentHomePage() {
       revokeThumbnailSlideMediaUrls(thumbnailRef.current);
       thumbnailRef.current = {};
     };
+  }, []);
+
+  useEffect(() => {
+    void fetch('/api/auth/me', { cache: 'no-store' })
+      .then((response) => response.json())
+      .then((payload: { user?: { displayName?: string } }) => {
+        if (payload.user?.displayName) setDisplayName(payload.user.displayName);
+      })
+      .catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -130,6 +166,36 @@ export default function StudentHomePage() {
     setTheme(theme === 'dark' ? 'light' : 'dark');
   }
 
+  async function joinClass() {
+    const code = inviteCode.trim();
+    if (!code) return;
+    setJoining(true);
+    try {
+      const response = await fetch('/api/campus/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inviteCode: code }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        success?: boolean;
+        error?: string;
+        className?: string;
+        courseCount?: number;
+      };
+      if (!response.ok || !payload.success) throw new Error(payload.error || '加入班级失败');
+      const records = await fetchCourses();
+      setCourses(records);
+      setInviteCode('');
+      toast.success(
+        `已加入${payload.className ?? '班级'}，同步 ${payload.courseCount ?? 0} 门课程`,
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '加入班级失败');
+    } finally {
+      setJoining(false);
+    }
+  }
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#f7f9fd] text-slate-950 dark:bg-[#071023] dark:text-slate-50">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -149,12 +215,6 @@ export default function StudentHomePage() {
         </Link>
 
         <div className="flex items-center gap-2">
-          <Link
-            href="/teacher"
-            className="hidden rounded-full border border-slate-200/80 bg-white/70 px-4 py-2 text-sm text-slate-600 shadow-sm backdrop-blur-md transition hover:border-violet-200 hover:text-violet-600 sm:block dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
-          >
-            进入教师端
-          </Link>
           <button
             type="button"
             onClick={cycleTheme}
@@ -163,12 +223,7 @@ export default function StudentHomePage() {
           >
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
-          <div className="ml-1 flex h-10 items-center gap-2 rounded-full border border-slate-200/80 bg-white/80 px-2.5 pr-4 shadow-sm dark:border-white/10 dark:bg-white/5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-100 text-sm font-semibold text-violet-600 dark:bg-violet-500/20 dark:text-violet-300">
-              学
-            </span>
-            <span className="text-sm font-medium">同学</span>
-          </div>
+          <AccountDock displayName={displayName} role="学生" floating={false} />
         </div>
       </header>
 
@@ -236,15 +291,37 @@ export default function StudentHomePage() {
               老师发布的课程会在这里出现，进入后使用学生课堂视图。
             </p>
           </div>
-          <label className="flex h-11 w-full items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-4 shadow-sm backdrop-blur-sm focus-within:border-violet-300 sm:w-72 dark:border-white/10 dark:bg-white/5">
-            <Search className="h-4 w-4 text-slate-400" />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="搜索已加入课程"
-              className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
-            />
-          </label>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <label className="flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-4 shadow-sm backdrop-blur-sm focus-within:border-violet-300 sm:w-64 dark:border-white/10 dark:bg-white/5">
+              <KeyRound className="h-4 w-4 text-slate-400" />
+              <input
+                value={inviteCode}
+                onChange={(event) => setInviteCode(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') void joinClass();
+                }}
+                placeholder="输入课堂码加入班级"
+                className="min-w-0 flex-1 bg-transparent text-sm uppercase outline-none placeholder:normal-case placeholder:text-slate-400"
+              />
+              <button
+                type="button"
+                disabled={joining || !inviteCode.trim()}
+                onClick={() => void joinClass()}
+                className="text-xs font-semibold text-violet-600 disabled:text-slate-300"
+              >
+                加入
+              </button>
+            </label>
+            <label className="flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-4 shadow-sm backdrop-blur-sm focus-within:border-violet-300 sm:w-56 dark:border-white/10 dark:bg-white/5">
+              <Search className="h-4 w-4 text-slate-400" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="搜索已加入课程"
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
+              />
+            </label>
+          </div>
         </div>
 
         {continueCourse && !query ? (
@@ -321,7 +398,7 @@ export default function StudentHomePage() {
         <div className="mb-6 flex items-end justify-between gap-4">
           <div>
             <p className="mb-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">
-              匿名学生 · 学习资产
+              {displayName} · 学习资产
             </p>
             <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">我的笔记</h2>
             <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
@@ -379,7 +456,9 @@ export default function StudentHomePage() {
           </div>
         ) : (
           <Link
-            href={continueCourse ? `/student/workflow?course=${continueCourse.id}` : '/student/workflow'}
+            href={
+              continueCourse ? `/student/workflow?course=${continueCourse.id}` : '/student/workflow'
+            }
             className="flex min-h-48 flex-col items-center justify-center rounded-[24px] border border-dashed border-slate-200 bg-white/50 px-6 text-center transition hover:border-emerald-300 hover:bg-emerald-50/30 dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-emerald-400/30"
           >
             <NotebookPen className="mb-4 h-9 w-9 text-slate-300 dark:text-slate-600" />

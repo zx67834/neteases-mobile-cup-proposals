@@ -6,10 +6,10 @@ import { verifyAccessTokenEdge } from '@/lib/server/access-token-edge';
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Return an actual server-side 404 when either half of the workbench is off.
-  // Edge middleware cannot reliably inspect server-only deployment variables,
-  // so it enforces the public gate and leaves the complete runtime/database
-  // check to Node. A Node-hosted middleware uses the same gate as startup.
+  // The root used to be the anonymous OpenMAIC teacher workspace. The campus
+  // product now starts at login; /teacher still reuses that mature workspace.
+  if (pathname === '/') return NextResponse.redirect(new URL('/login', request.url));
+
   const canInspectServerRuntime = process.env.NEXT_RUNTIME !== 'edge';
   const workbenchEnabled =
     isProWorkbenchEnabled() && (!canInspectServerRuntime || isAgentRuntimeConfigured());
@@ -18,22 +18,17 @@ export async function middleware(request: NextRequest) {
   }
 
   const accessCode = process.env.ACCESS_CODE;
-  if (!accessCode) {
-    return NextResponse.next();
-  }
+  if (!accessCode) return NextResponse.next();
 
-  // Whitelist: access-code endpoints, health check
   if (pathname.startsWith('/api/access-code/') || pathname === '/api/health') {
     return NextResponse.next();
   }
 
-  // Check cookie — validate HMAC signature, not just existence
   const cookie = request.cookies.get('openmaic_access');
   if (cookie?.value && (await verifyAccessTokenEdge(cookie.value, accessCode))) {
     return NextResponse.next();
   }
 
-  // API requests without valid cookie → 401
   if (pathname.startsWith('/api/')) {
     return NextResponse.json(
       { success: false, errorCode: 'INVALID_REQUEST', error: 'Access code required' },
@@ -41,7 +36,6 @@ export async function middleware(request: NextRequest) {
     );
   }
 
-  // Page requests → let through, frontend shows modal
   return NextResponse.next();
 }
 

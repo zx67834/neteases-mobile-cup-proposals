@@ -7,6 +7,7 @@ import {
 import { getServerPersistenceProvider } from '@/lib/persistence/server-provider';
 import { ANONYMOUS_STUDENT_ID } from '@/lib/student-workflow/identity';
 import { parseStudentWorkflowMemory } from '@/lib/student-workflow/storage';
+import { getCampusSessionFromRequest } from '@/lib/auth/campus-auth';
 
 export const runtime = 'nodejs';
 
@@ -27,12 +28,10 @@ export async function GET(request: Request) {
       return apiError(API_ERROR_CODES.INVALID_REQUEST, 400, '课程标识无效');
     }
     const { pool } = await getServerPersistenceProvider(connectionString);
-    const records = await listStudentLearningWorkflows(
-      pool,
-      ANONYMOUS_STUDENT_ID,
-      courseId,
-    );
-    return apiSuccess({ studentId: ANONYMOUS_STUDENT_ID, records });
+    const session = await getCampusSessionFromRequest(request);
+    const studentId = session?.role === 'student' ? session.id : ANONYMOUS_STUDENT_ID;
+    const records = await listStudentLearningWorkflows(pool, studentId, courseId);
+    return apiSuccess({ studentId, records });
   } catch (error) {
     console.error('[StudentNotes] Failed to list notes', error);
     return apiError(API_ERROR_CODES.INTERNAL_ERROR, 500, '学习笔记读取失败');
@@ -67,8 +66,10 @@ export async function PUT(request: Request) {
     }
 
     const { pool } = await getServerPersistenceProvider(connectionString);
-    const record = await upsertStudentLearningWorkflow(pool, ANONYMOUS_STUDENT_ID, memory);
-    return apiSuccess({ studentId: ANONYMOUS_STUDENT_ID, record });
+    const session = await getCampusSessionFromRequest(request);
+    const studentId = session?.role === 'student' ? session.id : ANONYMOUS_STUDENT_ID;
+    const record = await upsertStudentLearningWorkflow(pool, studentId, memory);
+    return apiSuccess({ studentId, record });
   } catch (error) {
     if (error instanceof SyntaxError) {
       return apiError(API_ERROR_CODES.INVALID_REQUEST, 400, '学习笔记格式无效');

@@ -11,6 +11,9 @@ import { isAgentRuntimeConfigured } from '@/lib/config/feature-flags';
 import { setStagePublished } from '@/lib/persistence/stage-meta';
 import { getStageAccessDb, resolveStageAccess } from '@/lib/server/stage-access';
 import { withRequestOwnerId } from '@/lib/server/agent-runtime/with-owner';
+import { getCampusSessionFromRequest } from '@/lib/auth/campus-auth';
+import { setCampusCoursePublished } from '@/lib/persistence/campus-data';
+import { getServerPersistenceProvider } from '@/lib/persistence/server-provider';
 
 export const runtime = 'nodejs';
 
@@ -39,6 +42,11 @@ export async function POST(req: NextRequest, { params }: Params) {
 
       const db = await getStageAccessDb();
       await setStagePublished(db, stageId, false, null);
+      const session = await getCampusSessionFromRequest(req);
+      if (session?.role === 'teacher') {
+        const { pool } = await getServerPersistenceProvider(process.env.DATABASE_URL ?? '');
+        await setCampusCoursePublished(pool, session.id, stageId, false);
+      }
 
       console.info('Stage unpublished', { stageId, ownerId });
       return NextResponse.json({ success: true }, { status: 200, headers: responseHeaders });

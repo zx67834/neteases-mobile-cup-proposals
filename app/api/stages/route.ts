@@ -23,6 +23,9 @@ import { getOwnerScopedDocumentStore } from '@/lib/server/agent-runtime/owner-sc
 import { ownerJson } from '@/lib/server/agent-runtime/route-response';
 import { STAGE_NAME_MAX_LENGTH } from '@/lib/server/agent-runtime/stage-limits';
 import { withRequestOwnerId } from '@/lib/server/agent-runtime/with-owner';
+import { getCampusSessionFromRequest } from '@/lib/auth/campus-auth';
+import { syncCampusCourseForStage } from '@/lib/persistence/campus-data';
+import { getServerPersistenceProvider } from '@/lib/persistence/server-provider';
 
 export const runtime = 'nodejs';
 
@@ -98,6 +101,11 @@ export async function POST(req: NextRequest) {
       scenes: [],
       outline,
     });
+    const session = await getCampusSessionFromRequest(req);
+    if (session?.role === 'teacher') {
+      const { pool } = await getServerPersistenceProvider(process.env.DATABASE_URL ?? '');
+      await syncCampusCourseForStage(pool, session, id);
+    }
     return ownerJson(
       {
         stage: {
