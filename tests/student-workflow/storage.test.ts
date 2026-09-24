@@ -86,6 +86,20 @@ describe('student workflow browser memory', () => {
     });
   });
 
+  it('keeps manually adjusted workflow connections across reloads', () => {
+    const memory = record();
+    memory.workflow.connections = [
+      { id: 'edge-goal-note', source: 'goal', target: 'note' },
+      { id: 'edge-note-practice', source: 'note', target: 'practice' },
+    ];
+    saveStudentWorkflowMemory(memory, storage);
+
+    expect(readStudentWorkflowMemories(storage)[0]?.workflow.connections).toEqual([
+      { id: 'edge-goal-note', source: 'goal', target: 'note' },
+      { id: 'edge-note-practice', source: 'note', target: 'practice' },
+    ]);
+  });
+
   it('ignores malformed cache data without breaking the student page', () => {
     storage.setItem(STUDENT_WORKFLOW_STORAGE_KEY, '{not-json');
     expect(readStudentWorkflowMemories(storage)).toEqual([]);

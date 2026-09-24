@@ -96,7 +96,7 @@ const getEdgeParams = (source: InternalNode<Node>, target: InternalNode<Node>) =
   };
 };
 
-const Animated = ({ id, source, target, markerEnd, style }: EdgeProps) => {
+const Animated = ({ id, source, target, markerEnd, selected, style }: EdgeProps) => {
   const sourceNode = useInternalNode(source);
   const targetNode = useInternalNode(target);
 
@@ -117,8 +117,16 @@ const Animated = ({ id, source, target, markerEnd, style }: EdgeProps) => {
 
   return (
     <>
-      <BaseEdge id={id} markerEnd={markerEnd} path={edgePath} style={style} />
-      <circle fill="var(--primary)" r="4">
+      <BaseEdge
+        id={id}
+        markerEnd={markerEnd}
+        path={edgePath}
+        style={{
+          ...style,
+          ...(selected ? { stroke: '#f43f5e', strokeWidth: 3 } : {}),
+        }}
+      />
+      <circle fill={selected ? '#f43f5e' : 'var(--primary)'} r={selected ? 5 : 4}>
         <animateMotion dur="2s" path={edgePath} repeatCount="indefinite" />
       </circle>
     </>

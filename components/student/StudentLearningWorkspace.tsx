@@ -29,9 +29,12 @@ import {
   NodeResizeControl,
   NodeResizer,
   Position,
+  type Connection,
   type Edge as ReactFlowEdge,
+  type OnReconnect,
   type Node as ReactFlowNode,
   type NodeProps,
+  useEdgesState,
   useNodesState,
 } from '@xyflow/react';
 import { toast } from 'sonner';
@@ -55,6 +58,7 @@ import type {
   StudentLearningIntent,
   StudentLearningWorkflow,
   StudentWorkflowAction,
+  StudentWorkflowConnection,
   StudentWorkflowNode,
   StudentWorkflowNodeKind,
   StudentWorkflowSource,
@@ -234,7 +238,7 @@ function LearningNode({ data, selected, width }: NodeProps<StudentFlowNode>) {
       <button
         type="button"
         onClick={() => onToggleAi(node.id)}
-        className={`nodrag absolute -right-4 top-1/2 z-30 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white text-white shadow-lg transition hover:scale-105 dark:border-slate-900 ${
+        className={`nodrag absolute -right-4 top-[34%] z-30 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white text-white shadow-lg transition hover:scale-105 dark:border-slate-900 ${
           aiOpen ? 'bg-violet-700' : 'bg-violet-500'
         }`}
         aria-label={aiOpen ? '关闭节点 AI' : '从此节点继续探索'}
@@ -281,7 +285,13 @@ function LearningNode({ data, selected, width }: NodeProps<StudentFlowNode>) {
           </div>
         </div>
       ) : null}
-      <Handle type="target" position={Position.Left} className="size-2.5! border-2! bg-white!" />
+      <Handle
+        type="target"
+        position={Position.Left}
+        title="拖到这里建立连接"
+        aria-label="接收学习链路"
+        className="size-4! border-2! border-white! bg-violet-500! shadow-md"
+      />
       <div className="flex shrink-0 cursor-grab items-start gap-3 border-b border-black/[0.05] px-4 py-3.5 active:cursor-grabbing dark:border-white/10">
         <span
           className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${theme.iconClass}`}
@@ -419,7 +429,14 @@ function LearningNode({ data, selected, width }: NodeProps<StudentFlowNode>) {
           右下角拖动缩放
         </span>
       </div>
-      <Handle type="source" position={Position.Right} className="size-2.5! border-2! bg-white!" />
+      <Handle
+        type="source"
+        position={Position.Right}
+        title="拖动创建学习链路"
+        aria-label="拖动创建学习链路"
+        className="size-4! border-2! border-white! bg-violet-500! shadow-md"
+        style={{ top: '68%' }}
+      />
     </div>
   );
 }
@@ -460,7 +477,7 @@ function layoutWorkflowNodes(
   });
 }
 
-function workflowEdges(workflow: StudentLearningWorkflow): ReactFlowEdge[] {
+function defaultWorkflowConnections(workflow: StudentLearningWorkflow): StudentWorkflowConnection[] {
   return workflow.nodes.flatMap((node) =>
     node.parentId
       ? [
@@ -468,13 +485,31 @@ function workflowEdges(workflow: StudentLearningWorkflow): ReactFlowEdge[] {
             id: `edge-${node.parentId}-${node.id}`,
             source: node.parentId,
             target: node.id,
-            type: 'animated',
-            markerEnd: { type: MarkerType.ArrowClosed, color: '#8b5cf6' },
-            style: { stroke: '#8b5cf6', strokeWidth: 1.8 },
           },
         ]
       : [],
   );
+}
+
+function workflowConnections(workflow: StudentLearningWorkflow): StudentWorkflowConnection[] {
+  const nodeIds = new Set(workflow.nodes.map((node) => node.id));
+  const connections = workflow.connections ?? defaultWorkflowConnections(workflow);
+  return connections.filter(
+    (connection) =>
+      connection.source !== connection.target &&
+      nodeIds.has(connection.source) &&
+      nodeIds.has(connection.target),
+  );
+}
+
+function workflowEdges(workflow: StudentLearningWorkflow): ReactFlowEdge[] {
+  return workflowConnections(workflow).map((connection) => ({
+    ...connection,
+    type: 'animated',
+    reconnectable: true,
+    markerEnd: { type: MarkerType.ArrowClosed, color: '#8b5cf6' },
+    style: { stroke: '#8b5cf6', strokeWidth: 1.8 },
+  }));
 }
 
 export function StudentLearningWorkspace({
@@ -603,6 +638,14 @@ export function StudentLearningWorkspace({
         return {
           ...current,
           nodes: [...current.nodes, result.node],
+          connections: [
+            ...workflowConnections(current),
+            {
+              id: `edge-${parentNode.id}-${result.node.id}`,
+              source: parentNode.id,
+              target: result.node.id,
+            },
+          ],
           sources: [...sourceMap.values()],
         };
       });
@@ -633,6 +676,7 @@ export function StudentLearningWorkspace({
   }
 
   const [canvasNodes, setCanvasNodes, onNodesChange] = useNodesState<StudentFlowNode>([]);
+  const [canvasEdges, setCanvasEdges, onEdgesChange] = useEdgesState<ReactFlowEdge>([]);
 
   const toggleNoteNodeSize = useCallback(
     (nodeId: string) => {
@@ -697,6 +741,77 @@ export function StudentLearningWorkspace({
     ],
   );
   const flowEdges = useMemo(() => (workflow ? workflowEdges(workflow) : []), [workflow]);
+
+  const connectNodes = useCallback((connection: Connection) => {
+    if (!connection.source || !connection.target || connection.source === connection.target) return;
+    setWorkflow((current) => {
+      if (!current) return current;
+      const connections = workflowConnections(current);
+      if (
+        connections.some(
+          (item) => item.source === connection.source && item.target === connection.target,
+        )
+      ) {
+        return current;
+      }
+      return {
+        ...current,
+        connections: [
+          ...connections,
+          {
+            id: `edge-${connection.source}-${connection.target}`,
+            source: connection.source!,
+            target: connection.target!,
+          },
+        ],
+      };
+    });
+  }, []);
+
+  const reconnectNodes = useCallback<OnReconnect<ReactFlowEdge>>((oldEdge, connection) => {
+    if (!connection.source || !connection.target || connection.source === connection.target) return;
+    setWorkflow((current) => {
+      if (!current) return current;
+      const connections = workflowConnections(current);
+      const duplicate = connections.some(
+        (item) =>
+          item.id !== oldEdge.id &&
+          item.source === connection.source &&
+          item.target === connection.target,
+      );
+      if (duplicate) return current;
+      return {
+        ...current,
+        connections: connections.map((item) =>
+          item.id === oldEdge.id
+            ? {
+                id: `edge-${connection.source}-${connection.target}`,
+                source: connection.source!,
+                target: connection.target!,
+              }
+            : item,
+        ),
+      };
+    });
+  }, []);
+
+  const deleteConnections = useCallback((edges: ReactFlowEdge[]) => {
+    const deletedIds = new Set(edges.map((edge) => edge.id));
+    setWorkflow((current) =>
+      current
+        ? {
+            ...current,
+            connections: workflowConnections(current).filter(
+              (connection) => !deletedIds.has(connection.id),
+            ),
+          }
+        : current,
+    );
+  }, []);
+
+  useEffect(() => {
+    setCanvasEdges(flowEdges);
+  }, [flowEdges, setCanvasEdges]);
 
   const savedForCourse = useMemo(
     () => savedMemories.filter((memory) => memory.courseId === selectedCourseId),
@@ -1029,7 +1144,7 @@ export function StudentLearningWorkspace({
                     ? '已保存到数据库 · 匿名学生'
                     : '已保存到浏览器 · 等待数据库'}
                 <span className="text-slate-300 dark:text-slate-600">·</span>
-                拖拽节点调整位置
+                拖动节点与连接点调整链路 · 选中连线按 Delete 删除
               </div>
             )}
           </div>
@@ -1040,11 +1155,16 @@ export function StudentLearningWorkspace({
             <Canvas
               key={workflow.id}
               nodes={canvasNodes}
-              edges={flowEdges}
+              edges={canvasEdges}
               onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={connectNodes}
+              onReconnect={reconnectNodes}
+              onEdgesDelete={deleteConnections}
               nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
-              nodesConnectable={false}
+              nodesConnectable
+              edgesReconnectable
               nodesDraggable
               panOnDrag
               fitView={!standalone}

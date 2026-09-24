@@ -45,6 +45,15 @@ function isWorkflow(value: unknown): value is StudentLearningWorkflow {
     typeof workflow.title === 'string' &&
     typeof workflow.prompt === 'string' &&
     Array.isArray(workflow.nodes) &&
+    (workflow.connections === undefined ||
+      (Array.isArray(workflow.connections) &&
+        workflow.connections.every(
+          (connection) =>
+            connection &&
+            typeof connection.id === 'string' &&
+            typeof connection.source === 'string' &&
+            typeof connection.target === 'string',
+        ))) &&
     Array.isArray(workflow.sources) &&
     Array.isArray(workflow.suggestedPrompts)
   );

@@ -30,6 +30,12 @@ export interface StudentWorkflowNode {
   studentAnswer?: string;
 }
 
+export interface StudentWorkflowConnection {
+  id: string;
+  source: string;
+  target: string;
+}
+
 export interface StudentLearningWorkflow {
   id: string;
   intent: StudentLearningIntent;
@@ -37,6 +43,7 @@ export interface StudentLearningWorkflow {
   summary: string;
   prompt: string;
   nodes: StudentWorkflowNode[];
+  connections?: StudentWorkflowConnection[];
   sources: StudentWorkflowSource[];
   suggestedPrompts: string[];
 }
