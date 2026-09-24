@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowRight,
@@ -12,7 +12,9 @@ import {
   History,
   Lightbulb,
   Loader2,
+  Maximize2,
   MessageCircleQuestion,
+  Minimize2,
   NotebookPen,
   PencilLine,
   RefreshCcw,
@@ -24,6 +26,8 @@ import {
 import {
   Handle,
   MarkerType,
+  NodeResizeControl,
+  NodeResizer,
   Position,
   type Edge as ReactFlowEdge,
   type Node as ReactFlowNode,
@@ -70,6 +74,9 @@ type StudentNodeData = {
   onAction: (node: StudentWorkflowNode, action: StudentWorkflowAction, answer?: string) => void;
   onEdit: (nodeId: string, content: string) => void;
   onOpenSource: (sceneId: string) => void;
+  onToggleSize: (nodeId: string) => void;
+  aiOpen: boolean;
+  onToggleAi: (nodeId: string) => void;
 };
 
 type StudentFlowNode = ReactFlowNode<StudentNodeData, 'studentLearning'>;
@@ -152,20 +159,130 @@ const NODE_THEME: Record<
   },
 };
 
-function LearningNode({ data }: NodeProps<StudentFlowNode>) {
-  const { node, sources, busy, onAction, onEdit, onOpenSource } = data;
+function LearningNode({ data, selected, width }: NodeProps<StudentFlowNode>) {
+  const {
+    node,
+    sources,
+    busy,
+    aiOpen,
+    onAction,
+    onEdit,
+    onOpenSource,
+    onToggleSize,
+    onToggleAi,
+  } = data;
   const [answer, setAnswer] = useState(node.studentAnswer ?? '');
   const [showHint, setShowHint] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const expanded = (width ?? 330) >= 500;
   const theme = NODE_THEME[node.kind];
   const Icon = theme.icon;
+  const resizeColor = node.kind === 'note' ? '#10b981' : '#8b5cf6';
+  const minimumHeight = node.kind === 'note' ? 300 : 220;
   const nodeSources = sources.filter((source) => node.sourceSceneIds.includes(source.sceneId));
 
   return (
     <div
-      className={`w-[330px] overflow-hidden rounded-[22px] border shadow-xl shadow-slate-900/[0.08] backdrop-blur ${theme.shell}`}
+      className={`flex h-full min-h-[220px] w-full min-w-[300px] flex-col ${
+        selected
+          ? node.kind === 'note'
+            ? 'ring-2 ring-emerald-400/70 ring-offset-2 ring-offset-transparent'
+            : 'ring-2 ring-violet-400/70 ring-offset-2 ring-offset-transparent'
+          : ''
+      } relative rounded-[22px] border shadow-xl shadow-slate-900/[0.08] backdrop-blur ${theme.shell}`}
     >
+      <NodeResizer
+        isVisible={selected}
+        minWidth={300}
+        minHeight={minimumHeight}
+        maxWidth={900}
+        maxHeight={900}
+        color={resizeColor}
+        handleClassName="nodrag"
+        lineClassName="nodrag"
+      />
+      <NodeResizeControl
+        position="bottom-right"
+        minWidth={300}
+        minHeight={minimumHeight}
+        maxWidth={900}
+        maxHeight={900}
+        className="nodrag"
+        style={{
+          right: 7,
+          bottom: 7,
+          left: 'auto',
+          top: 'auto',
+          width: 24,
+          height: 24,
+          transform: 'none',
+          translate: 'none',
+          border: 'none',
+          background: 'transparent',
+          zIndex: 20,
+        }}
+      >
+        <span
+          title="拖动调整节点窗口大小"
+          aria-hidden="true"
+          className="block h-full w-full rounded-br-xl opacity-55 transition-opacity hover:opacity-100"
+          style={{
+            backgroundImage: `repeating-linear-gradient(135deg, transparent 0 4px, ${resizeColor} 4px 6px)`,
+          }}
+        />
+      </NodeResizeControl>
+      <button
+        type="button"
+        onClick={() => onToggleAi(node.id)}
+        className={`nodrag absolute -right-4 top-1/2 z-30 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white text-white shadow-lg transition hover:scale-105 dark:border-slate-900 ${
+          aiOpen ? 'bg-violet-700' : 'bg-violet-500'
+        }`}
+        aria-label={aiOpen ? '关闭节点 AI' : '从此节点继续探索'}
+        title="从此节点继续探索"
+      >
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+      </button>
+      {aiOpen ? (
+        <div className="nodrag nowheel absolute left-full top-12 z-40 ml-6 w-[290px] rounded-2xl border border-violet-200 bg-white/95 p-3.5 shadow-2xl shadow-violet-950/15 backdrop-blur dark:border-violet-400/25 dark:bg-slate-900/95">
+          <div className="flex items-center gap-2 text-xs font-semibold text-violet-600 dark:text-violet-300">
+            <Sparkles className="h-3.5 w-3.5" />
+            从“{node.title.slice(0, 18)}”继续
+          </div>
+          <textarea
+            autoFocus
+            value={aiPrompt}
+            onChange={(event) => setAiPrompt(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey && aiPrompt.trim() && !busy) {
+                event.preventDefault();
+                onAction(node, 'explore', aiPrompt.trim());
+                setAiPrompt('');
+                onToggleAi(node.id);
+              }
+            }}
+            placeholder="例如：我想看看它在游戏匹配中的应用"
+            className="mt-3 min-h-24 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm leading-5 text-slate-700 outline-none transition focus:border-violet-400 focus:bg-white dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
+            aria-label="输入下一步探索内容"
+          />
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <span className="text-[10px] text-slate-400">Enter 生成新卡片</span>
+            <button
+              type="button"
+              disabled={!aiPrompt.trim() || busy}
+              onClick={() => {
+                onAction(node, 'explore', aiPrompt.trim());
+                setAiPrompt('');
+                onToggleAi(node.id);
+              }}
+              className="rounded-full bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              生成下一步
+            </button>
+          </div>
+        </div>
+      ) : null}
       <Handle type="target" position={Position.Left} className="size-2.5! border-2! bg-white!" />
-      <div className="flex items-start gap-3 border-b border-black/[0.05] px-4 py-3.5 dark:border-white/10">
+      <div className="flex shrink-0 cursor-grab items-start gap-3 border-b border-black/[0.05] px-4 py-3.5 active:cursor-grabbing dark:border-white/10">
         <span
           className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${theme.iconClass}`}
         >
@@ -179,14 +296,25 @@ function LearningNode({ data }: NodeProps<StudentFlowNode>) {
             {node.title}
           </h3>
         </div>
+        {node.kind === 'note' ? (
+          <button
+            type="button"
+            onClick={() => onToggleSize(node.id)}
+            className="nodrag flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-emerald-200/80 bg-white/75 text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-400/20 dark:bg-white/10 dark:text-emerald-200"
+            aria-label={expanded ? '收起笔记节点' : '展开笔记节点'}
+            title={expanded ? '收起笔记节点' : '展开笔记节点'}
+          >
+            {expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          </button>
+        ) : null}
       </div>
 
-      <div className="px-4 py-4">
+      <div className="nowheel flex min-h-0 flex-1 flex-col overflow-auto px-4 py-4">
         {node.kind === 'note' ? (
           <textarea
             value={node.content}
             onChange={(event) => onEdit(node.id, event.target.value)}
-            className="nodrag nowheel min-h-32 w-full resize-none rounded-xl border border-emerald-200/80 bg-white/80 p-3 text-sm leading-6 text-slate-700 outline-none focus:border-emerald-400 dark:border-emerald-400/20 dark:bg-black/10 dark:text-slate-200"
+            className="nodrag nowheel min-h-32 w-full flex-1 resize-none rounded-xl border border-emerald-200/80 bg-white/80 p-3 text-sm leading-6 text-slate-700 outline-none focus:border-emerald-400 dark:border-emerald-400/20 dark:bg-black/10 dark:text-slate-200"
             aria-label="编辑学习笔记"
           />
         ) : (
@@ -252,7 +380,7 @@ function LearningNode({ data }: NodeProps<StudentFlowNode>) {
         ) : null}
       </div>
 
-      <div className="flex flex-wrap gap-2 border-t border-black/[0.05] px-4 py-3 dark:border-white/10">
+      <div className="flex shrink-0 flex-wrap gap-2 border-t border-black/[0.05] px-4 py-3 dark:border-white/10">
         {node.kind !== 'practice' ? (
           <button
             type="button"
@@ -281,6 +409,15 @@ function LearningNode({ data }: NodeProps<StudentFlowNode>) {
             记成笔记
           </button>
         ) : null}
+        <span
+          className={`ml-auto self-center pr-5 text-[10px] font-medium ${
+            node.kind === 'note'
+              ? 'text-emerald-700/55 dark:text-emerald-200/50'
+              : 'text-violet-700/50 dark:text-violet-200/50'
+          }`}
+        >
+          右下角拖动缩放
+        </span>
       </div>
       <Handle type="source" position={Position.Right} className="size-2.5! border-2! bg-white!" />
     </div>
@@ -310,6 +447,10 @@ function layoutWorkflowNodes(
     return {
       id: node.id,
       type: 'studentLearning',
+      style: {
+        width: 330,
+        ...(node.kind === 'note' ? { height: 360 } : {}),
+      },
       position: {
         x: depth * 390,
         y: (index - (siblings.length - 1) / 2) * 540,
@@ -348,6 +489,7 @@ export function StudentLearningWorkspace({
   const [workflow, setWorkflow] = useState<StudentLearningWorkflow | null>(null);
   const [generating, setGenerating] = useState(false);
   const [expandingNodeId, setExpandingNodeId] = useState<string | null>(null);
+  const [activeAiNodeId, setActiveAiNodeId] = useState<string | null>(null);
   const [progressIndex, setProgressIndex] = useState(0);
   const [savedMemories, setSavedMemories] = useState<StudentWorkflowMemory[]>([]);
   const [storageReady, setStorageReady] = useState(false);
@@ -487,7 +629,33 @@ export function StudentLearningWorkspace({
     setWorkflow(null);
     setGenerating(false);
     setExpandingNodeId(null);
+    setActiveAiNodeId(null);
   }
+
+  const [canvasNodes, setCanvasNodes, onNodesChange] = useNodesState<StudentFlowNode>([]);
+
+  const toggleNoteNodeSize = useCallback(
+    (nodeId: string) => {
+      setCanvasNodes((currentNodes) =>
+        currentNodes.map((canvasNode) => {
+          if (canvasNode.id !== nodeId) return canvasNode;
+          const styleWidth =
+            typeof canvasNode.style?.width === 'number' ? canvasNode.style.width : undefined;
+          const currentWidth = canvasNode.measured?.width ?? styleWidth ?? 330;
+          const shouldExpand = currentWidth < 500;
+          return {
+            ...canvasNode,
+            style: {
+              ...canvasNode.style,
+              width: shouldExpand ? 620 : 330,
+              height: shouldExpand ? 560 : 360,
+            },
+          };
+        }),
+      );
+    },
+    [setCanvasNodes],
+  );
 
   function restoreMemory(memory: StudentWorkflowMemory) {
     pendingPositionsRef.current = memory.nodePositions;
@@ -504,9 +672,13 @@ export function StudentLearningWorkspace({
             node,
             sources: workflow.sources,
             busy: expandingNodeId === node.id,
+            aiOpen: activeAiNodeId === node.id,
             onAction: (targetNode, action, answer) =>
               void handleNodeAction(targetNode, action, answer),
             onEdit: editNode,
+            onToggleSize: toggleNoteNodeSize,
+            onToggleAi: (nodeId) =>
+              setActiveAiNodeId((current) => (current === nodeId ? null : nodeId)),
             onOpenSource: (sceneId) =>
               router.push(
                 `/student/classroom/${selectedCourseId}?scene=${encodeURIComponent(sceneId)}`,
@@ -515,10 +687,16 @@ export function StudentLearningWorkspace({
         : [],
     // handleNodeAction reads the latest workflow and selected course from this render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [workflow, expandingNodeId, router, selectedCourseId],
+    [
+      workflow,
+      expandingNodeId,
+      activeAiNodeId,
+      router,
+      selectedCourseId,
+      toggleNoteNodeSize,
+    ],
   );
   const flowEdges = useMemo(() => (workflow ? workflowEdges(workflow) : []), [workflow]);
-  const [canvasNodes, setCanvasNodes, onNodesChange] = useNodesState<StudentFlowNode>([]);
 
   const savedForCourse = useMemo(
     () => savedMemories.filter((memory) => memory.courseId === selectedCourseId),
@@ -553,13 +731,23 @@ export function StudentLearningWorkspace({
     }
     const pendingPositions = pendingPositionsRef.current;
     setCanvasNodes((currentNodes) => {
-      const currentPositions = new Map(
-        currentNodes.map((node) => [node.id, node.position] as const),
-      );
-      return flowNodes.map((node) => ({
-        ...node,
-        position: pendingPositions?.[node.id] ?? currentPositions.get(node.id) ?? node.position,
-      }));
+      const currentById = new Map(currentNodes.map((node) => [node.id, node] as const));
+      return flowNodes.map((node) => {
+        const current = currentById.get(node.id);
+        const savedLayout = pendingPositions?.[node.id];
+        return {
+          ...node,
+          position: savedLayout
+            ? { x: savedLayout.x, y: savedLayout.y }
+            : (current?.position ?? node.position),
+          style: {
+            ...node.style,
+            ...current?.style,
+            ...(savedLayout?.width ? { width: savedLayout.width } : {}),
+            ...(savedLayout?.height ? { height: savedLayout.height } : {}),
+          },
+        };
+      });
     });
     pendingPositionsRef.current = null;
   }, [flowNodes, setCanvasNodes]);
@@ -572,7 +760,24 @@ export function StudentLearningWorkspace({
         (memory) => memory.workflow.id === workflow.id,
       );
       const nodePositions = Object.fromEntries(
-        canvasNodes.map((node) => [node.id, { x: node.position.x, y: node.position.y }]),
+        canvasNodes.map((node) => {
+          const styleWidth = typeof node.style?.width === 'number' ? node.style.width : undefined;
+          const styleHeight =
+            typeof node.style?.height === 'number' ? node.style.height : undefined;
+          return [
+            node.id,
+            {
+              x: node.position.x,
+              y: node.position.y,
+              ...(node.measured?.width || styleWidth
+                ? { width: node.measured?.width ?? styleWidth }
+                : {}),
+              ...(node.measured?.height || styleHeight
+                ? { height: node.measured?.height ?? styleHeight }
+                : {}),
+            },
+          ];
+        }),
       );
       const memory = {
         courseId: selectedCourseId,

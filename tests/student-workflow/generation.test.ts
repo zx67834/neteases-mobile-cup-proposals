@@ -103,4 +103,28 @@ describe('student workflow generation', () => {
     expect(expandPrompt).toContain('为了缩小区间');
     expect(expandPrompt).toContain('可执行的改进建议');
   });
+
+  it('uses the student freeform request to generate the next node', () => {
+    const prompt = buildStudentWorkflowExpansionPrompt({
+      courseName: '算法课',
+      action: 'explore',
+      workflowPrompt: '学习二分查找',
+      parentNode: {
+        kind: 'explanation',
+        title: '闭区间边界',
+        content: '每轮都要跳过 mid。',
+      },
+      answer: '我想看看它在游戏匹配中的应用',
+      evidence: 'scene-2：边界陷阱',
+    });
+
+    const node = parseStudentWorkflowExpansion(
+      '{"kind":"example","title":"游戏匹配","content":"用分段积分匹配合适对手。"}',
+      { action: 'explore', parentId: 'boundary-node', sources },
+    );
+
+    expect(prompt).toContain('我想看看它在游戏匹配中的应用');
+    expect(node.kind).toBe('example');
+    expect(node.parentId).toBe('boundary-node');
+  });
 });

@@ -72,6 +72,20 @@ describe('student workflow browser memory', () => {
     expect(records[0]?.nodePositions.goal).toEqual({ x: 420, y: 360 });
   });
 
+  it('keeps a resized node layout across reloads', () => {
+    saveStudentWorkflowMemory(
+      record({ nodePositions: { goal: { x: 420, y: 360, width: 620, height: 560 } } }),
+      storage,
+    );
+
+    expect(readStudentWorkflowMemories(storage)[0]?.nodePositions.goal).toEqual({
+      x: 420,
+      y: 360,
+      width: 620,
+      height: 560,
+    });
+  });
+
   it('ignores malformed cache data without breaking the student page', () => {
     storage.setItem(STUDENT_WORKFLOW_STORAGE_KEY, '{not-json');
     expect(readStudentWorkflowMemories(storage)).toEqual([]);

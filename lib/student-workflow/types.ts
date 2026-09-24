@@ -1,6 +1,6 @@
 export type StudentLearningIntent = 'question' | 'practice' | 'note';
 
-export type StudentWorkflowAction = 'explain' | 'practice' | 'note' | 'grade';
+export type StudentWorkflowAction = 'explain' | 'practice' | 'note' | 'grade' | 'explore';
 
 export type StudentWorkflowNodeKind =
   | 'goal'

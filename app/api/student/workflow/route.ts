@@ -37,7 +37,13 @@ type WorkflowBody = {
 };
 
 const intents = new Set<StudentLearningIntent>(['question', 'practice', 'note']);
-const actions = new Set<StudentWorkflowAction>(['explain', 'practice', 'note', 'grade']);
+const actions = new Set<StudentWorkflowAction>([
+  'explain',
+  'practice',
+  'note',
+  'grade',
+  'explore',
+]);
 
 function parseIntent(value: unknown): StudentLearningIntent | null {
   return typeof value === 'string' && intents.has(value as StudentLearningIntent)
@@ -106,8 +112,11 @@ export async function POST(req: NextRequest) {
     if (action === 'grade' && !answer) {
       return apiError('INVALID_REQUEST', 400, '提交练习前需要填写答案');
     }
+    if (action === 'explore' && !answer) {
+      return apiError('INVALID_REQUEST', 400, '请输入下一步想探索的内容');
+    }
 
-    const evidenceQuery = [prompt, parentNode?.title, parentNode?.content]
+    const evidenceQuery = [prompt, answer, parentNode?.title, parentNode?.content]
       .filter(Boolean)
       .join(' ');
     const evidence = selectStudentQaEvidence(document, evidenceQuery, undefined, 5);
@@ -203,6 +212,7 @@ export async function POST(req: NextRequest) {
           action: action!,
           parentNode: parentNode!,
           sources,
+          request: answer,
         });
       }
       const response = apiSuccess({ node, sources });
@@ -230,6 +240,7 @@ export async function POST(req: NextRequest) {
             action,
             parentNode,
             sources,
+            request: answer,
           }),
           sources,
           degraded: true,

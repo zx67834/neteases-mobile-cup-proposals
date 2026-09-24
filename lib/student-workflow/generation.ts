@@ -203,6 +203,7 @@ export function buildFallbackStudentWorkflowExpansion(options: {
   action: Exclude<StudentWorkflowAction, 'grade'>;
   parentNode: StudentWorkflowNode;
   sources: StudentWorkflowSource[];
+  request?: string;
 }): StudentWorkflowNode {
   const primarySource = options.sources[0];
   const sourceIds = primarySource ? [primarySource.sceneId] : [];
@@ -231,6 +232,14 @@ export function buildFallbackStudentWorkflowExpansion(options: {
       kind: 'note',
       title: `${options.parentNode.title} · 笔记卡`,
       content: `课程依据：${sourceLabel}\n\n核心结论：${options.parentNode.content}\n\n我的补充：`,
+    };
+  }
+  if (options.action === 'explore') {
+    return {
+      ...common,
+      kind: 'explanation',
+      title: options.request?.slice(0, 36) || `${options.parentNode.title} · 自由探索`,
+      content: `围绕“${options.request || options.parentNode.title}”，先联系当前节点的核心结论，再回到${sourceLabel}核对相关条件与例子。你可以继续从这张卡片追问、生成练习或整理笔记。`,
     };
   }
   return {
@@ -314,6 +323,7 @@ export function buildStudentWorkflowExpansionPrompt({
     practice: '根据当前节点生成一道新的 practice 题目，只出题，不公布答案。',
     note: '把当前节点整理为一张可独立阅读和继续编辑的 note 知识卡片。',
     grade: `评价学生答案，指出做对之处、需要修正之处和下一步建议。学生答案：${answer || '未提供'}`,
+    explore: `根据学生的自由探索要求生成下一步节点。学生要求：${answer || '换一个相关方向继续学习'}`,
   };
 
   return `你是“${courseName}”课程的学习工作流执行器。

@@ -10,6 +10,8 @@ const MAX_SAVED_WORKFLOWS = 30;
 export interface StudentWorkflowPosition {
   x: number;
   y: number;
+  width?: number;
+  height?: number;
 }
 
 export interface StudentWorkflowMemory {
@@ -51,7 +53,12 @@ function isWorkflow(value: unknown): value is StudentLearningWorkflow {
 function isPosition(value: unknown): value is StudentWorkflowPosition {
   if (!value || typeof value !== 'object') return false;
   const position = value as Partial<StudentWorkflowPosition>;
-  return Number.isFinite(position.x) && Number.isFinite(position.y);
+  return (
+    Number.isFinite(position.x) &&
+    Number.isFinite(position.y) &&
+    (position.width === undefined || Number.isFinite(position.width)) &&
+    (position.height === undefined || Number.isFinite(position.height))
+  );
 }
 
 export function parseStudentWorkflowMemory(value: unknown): StudentWorkflowMemory | null {
