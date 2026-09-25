@@ -100,6 +100,14 @@ pnpm dev -- -p 3010
 
 > 端口 3010 用于避开与本地其他服务（如 Open WebUI 的 3000）冲突，可按需调整。
 
+### 账号与模型配置
+
+配置 `DATABASE_URL` 后，教师和学生可在登录页创建账号，并在头像菜单的「账号设置」中修改登录账号、显示名称、真实姓名和密码。修改密码会让其他设备的登录失效。
+
+测试阶段可在服务器的 `.env.local` 中设置 `DEEPSEEK_API_KEY`；新教师账号默认选择 DeepSeek V4 Pro，新学生账号默认选择 DeepSeek V4 Flash，均可使用该测试 Key。每个账号也可以在「账号设置」的 OpenMAIC 风格模型面板中选择模型、测试连接并保存自己的 DeepSeek Key；服务端会加密后存入 PostgreSQL 的 `campus_user_model_settings`，页面只显示是否已配置，不回传 Key。
+
+保存个人 Key 还需要设置 `CAMPUS_CREDENTIAL_ENCRYPTION_KEY`（64 位十六进制随机值）。部署迁移时必须保留此值，否则已有个人 Key 无法解密。数据库结构可用 `DATABASE_URL=... pnpm exec tsx scripts/migrate-campus-schema.ts` 更新；该命令只创建或扩展表结构，不导入账号、课程或密钥数据。
+
 ## 项目结构
 
 ```text

@@ -1,7 +1,5 @@
 'use client';
 
-import { getCurrentModelConfig } from '@/lib/utils/model-config';
-
 export type StudentQaMode = 'study' | 'classroom';
 
 export interface StudentQaSource {
@@ -44,22 +42,16 @@ export async function streamStudentQa({
   onSources?: (sources: StudentQaSource[]) => void;
   onDelta: (delta: string) => void;
 }): Promise<void> {
-  const modelConfig = getCurrentModelConfig();
   const response = await fetch('/api/student/qa', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-model': modelConfig.modelString,
-      'x-api-key': modelConfig.apiKey,
-      'x-base-url': modelConfig.baseUrl,
-      ...(modelConfig.providerType ? { 'x-provider-type': modelConfig.providerType } : {}),
     },
     body: JSON.stringify({
       courseId,
       currentSceneId,
       messages,
       mode,
-      thinkingConfig: modelConfig.thinkingConfig,
     }),
     signal,
   });

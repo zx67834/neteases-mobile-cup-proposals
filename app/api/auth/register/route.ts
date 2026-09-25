@@ -25,6 +25,7 @@ export async function POST(request: Request) {
   const username = typeof input.username === 'string' ? input.username.trim() : '';
   const password = typeof input.password === 'string' ? input.password : '';
   const displayName = typeof input.displayName === 'string' ? input.displayName.trim() : '';
+  const realName = typeof input.realName === 'string' ? input.realName.trim() : '';
   const role = input.role as CampusRole;
   if (!USERNAME_PATTERN.test(username)) {
     return apiError('INVALID_REQUEST', 400, '账号需为 3—32 位字母、数字、下划线或短横线');
@@ -32,12 +33,17 @@ export async function POST(request: Request) {
   if (password.length < 8 || password.length > 200) {
     return apiError('INVALID_REQUEST', 400, '密码至少需要 8 位');
   }
-  if (!displayName || displayName.length > 50 || (role !== 'teacher' && role !== 'student')) {
+  if (
+    !displayName ||
+    displayName.length > 50 ||
+    realName.length > 50 ||
+    (role !== 'teacher' && role !== 'student')
+  ) {
     return apiError('INVALID_REQUEST', 400, '姓名或身份无效');
   }
 
   try {
-    const user = await registerCampusUser({ username, password, displayName, role });
+    const user = await registerCampusUser({ username, password, displayName, realName, role });
     const session = await createCampusSession(user);
     const response = NextResponse.json(
       { success: true, user, redirectTo: campusHomeForRole(user.role) },

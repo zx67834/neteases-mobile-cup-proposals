@@ -1,5 +1,5 @@
 import { resolveRequestOwnerId } from './owner';
-import { getCampusSessionFromRequest } from '@/lib/auth/campus-auth';
+import { withCampusModelContext } from '@/lib/auth/campus-model-context';
 
 /**
  * Resolve the anonymous owner identity and run a handler with its response
@@ -15,9 +15,19 @@ export async function withRequestOwnerId(
   handler: (ownerId: string, responseHeaders: Headers) => Promise<Response>,
 ): Promise<Response> {
   const responseHeaders = new Headers();
-  const session = await getCampusSessionFromRequest(req);
+  const session = req.headers.get('cookie')?.includes('openmaic_campus_session=')
+    ? await (await import('@/lib/auth/campus-auth')).getCampusSessionFromRequest(req)
+    : null;
   const ownerId = resolveRequestOwnerId(req, responseHeaders, session?.userKey);
   try {
+    if (session && (session.role === 'teacher' || session.role === 'student')) {
+      const { getCampusModelSettings } = await import('@/lib/auth/campus-model-settings');
+      const settings = await getCampusModelSettings(session.id);
+      return await withCampusModelContext(
+        { modelString: `${settings.providerId}/${settings.modelId}`, apiKey: settings.apiKey },
+        () => handler(ownerId, responseHeaders),
+      );
+    }
     return await handler(ownerId, responseHeaders);
   } catch (error) {
     console.error('[agent-runtime] request failed under an owner', error);

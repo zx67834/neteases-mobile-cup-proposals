@@ -18,10 +18,21 @@ export function LoginPanel() {
     setPending(true);
     setError('');
     const form = new FormData(event.currentTarget);
+    if (mode === 'register' && form.get('password') !== form.get('confirmPassword')) {
+      setError('两次输入的密码不一致');
+      setPending(false);
+      return;
+    }
     const payload = {
       username: String(form.get('username') ?? ''),
       password: String(form.get('password') ?? ''),
-      ...(mode === 'register' ? { displayName: String(form.get('displayName') ?? ''), role } : {}),
+      ...(mode === 'register'
+        ? {
+            displayName: String(form.get('displayName') ?? ''),
+            realName: String(form.get('realName') ?? ''),
+            role,
+          }
+        : {}),
     };
     try {
       const response = await fetch(`/api/auth/${mode}`, {
@@ -142,13 +153,25 @@ export function LoginPanel() {
                     </button>
                   </div>
                   <label className="block">
-                    <span className="mb-2 block text-sm font-medium text-slate-700">姓名</span>
+                    <span className="mb-2 block text-sm font-medium text-slate-700">显示名称</span>
                     <input
                       name="displayName"
                       required
                       maxLength={50}
                       className="h-12 w-full rounded-2xl border border-slate-200 px-4 outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
-                      placeholder="请输入姓名"
+                      placeholder="课堂中展示的名称"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-medium text-slate-700">
+                      真实姓名（选填）
+                    </span>
+                    <input
+                      name="realName"
+                      maxLength={50}
+                      autoComplete="name"
+                      className="h-12 w-full rounded-2xl border border-slate-200 px-4 outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
+                      placeholder="可在账号设置中补充"
                     />
                   </label>
                 </>
@@ -160,6 +183,8 @@ export function LoginPanel() {
                   <input
                     name="username"
                     required
+                    minLength={3}
+                    maxLength={32}
                     autoComplete="username"
                     className="h-12 w-full rounded-2xl border border-slate-200 pl-12 pr-4 outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
                     placeholder="请输入账号"
@@ -181,6 +206,20 @@ export function LoginPanel() {
                   />
                 </div>
               </label>
+              {mode === 'register' ? (
+                <label className="block">
+                  <span className="mb-2 block text-sm font-medium text-slate-700">确认密码</span>
+                  <input
+                    name="confirmPassword"
+                    type="password"
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                    className="h-12 w-full rounded-2xl border border-slate-200 px-4 outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
+                    placeholder="再次输入密码"
+                  />
+                </label>
+              ) : null}
               {error ? (
                 <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>
               ) : null}

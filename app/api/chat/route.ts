@@ -18,7 +18,7 @@ import { isProviderKeyRequired } from '@/lib/ai/providers';
 import type { StatelessChatRequest, StatelessEvent } from '@/lib/types/chat';
 import { apiError } from '@/lib/server/api-response';
 import { createLogger } from '@/lib/logger';
-import { resolveModel } from '@/lib/server/resolve-model';
+import { resolveCampusChatModel, resolveModel } from '@/lib/server/resolve-model';
 import type { ThinkingConfig } from '@/lib/types/provider';
 const log = createLogger('Chat API');
 
@@ -69,16 +69,25 @@ export async function POST(req: NextRequest) {
       apiKey: resolvedApiKey,
       providerId,
       thinkingConfig: resolvedThinking,
-    } = await resolveModel({
-      modelString: body.model,
-      stage: 'chat-adapter',
-      apiKey: body.apiKey,
-      baseUrl: body.baseUrl,
-      providerType: body.providerType,
-      // Let resolveModel arbitrate thinking too: a routed chat-adapter's thinking
-      // wins, an unrouted one honors this client thinking (see resolve-model.ts).
-      thinkingConfig: body.thinkingConfig ?? body.thinking,
-    });
+    } = await (req.headers.get('cookie')?.includes('openmaic_campus_session=')
+      ? resolveCampusChatModel(req, {
+          modelString: body.model,
+          stage: 'chat-adapter',
+          apiKey: body.apiKey,
+          baseUrl: body.baseUrl,
+          providerType: body.providerType,
+          thinkingConfig: body.thinkingConfig ?? body.thinking,
+        })
+      : resolveModel({
+          modelString: body.model,
+          stage: 'chat-adapter',
+          apiKey: body.apiKey,
+          baseUrl: body.baseUrl,
+          providerType: body.providerType,
+          // Let resolveModel arbitrate thinking too: a routed chat-adapter's thinking
+          // wins, an unrouted one honors this client thinking (see resolve-model.ts).
+          thinkingConfig: body.thinkingConfig ?? body.thinking,
+        }));
 
     if (isProviderKeyRequired(providerId) && !resolvedApiKey) {
       return apiError('MISSING_API_KEY', 401, 'API Key is required');

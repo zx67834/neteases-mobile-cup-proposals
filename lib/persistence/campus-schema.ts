@@ -7,6 +7,7 @@ const CAMPUS_SCHEMA_STATEMENTS = [
     username TEXT NOT NULL,
     password_hash TEXT NOT NULL,
     display_name TEXT NOT NULL DEFAULT '',
+    real_name TEXT NOT NULL DEFAULT '',
     role TEXT NOT NULL CHECK (role IN ('teacher', 'student', 'admin')),
     user_key TEXT NOT NULL,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -14,12 +15,22 @@ const CAMPUS_SCHEMA_STATEMENTS = [
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     last_login_at TIMESTAMPTZ
   )`,
+  `ALTER TABLE campus_users ADD COLUMN IF NOT EXISTS real_name TEXT NOT NULL DEFAULT ''`,
   `CREATE UNIQUE INDEX IF NOT EXISTS campus_users_username_uidx
     ON campus_users (lower(username))`,
   `CREATE UNIQUE INDEX IF NOT EXISTS campus_users_user_key_uidx
     ON campus_users (user_key)`,
   `CREATE INDEX IF NOT EXISTS campus_users_role_idx
     ON campus_users (role) WHERE is_active`,
+  `CREATE TABLE IF NOT EXISTS campus_user_model_settings (
+    user_id TEXT PRIMARY KEY REFERENCES campus_users(id) ON DELETE CASCADE,
+    provider_id TEXT NOT NULL DEFAULT 'deepseek',
+    model_id TEXT NOT NULL DEFAULT 'deepseek-v4-flash',
+    api_key_ciphertext TEXT,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`,
+  `ALTER TABLE campus_user_model_settings
+    DROP CONSTRAINT IF EXISTS campus_user_model_settings_provider_id_check`,
   `CREATE TABLE IF NOT EXISTS campus_user_sessions (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL REFERENCES campus_users(id) ON DELETE CASCADE,

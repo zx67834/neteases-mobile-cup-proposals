@@ -2,7 +2,15 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { BookOpenCheck, ChevronDown, LogOut, Mail, RefreshCw, UserRound } from 'lucide-react';
+import {
+  BookOpenCheck,
+  ChevronDown,
+  LogOut,
+  Mail,
+  RefreshCw,
+  Settings,
+  UserRound,
+} from 'lucide-react';
 
 export function AccountDock({
   displayName,
@@ -58,6 +66,13 @@ export function AccountDock({
               站内消息
             </Link>
           ) : null}
+          <Link
+            href="/account"
+            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition hover:bg-violet-50 hover:text-violet-700 dark:hover:bg-violet-500/10"
+          >
+            <Settings className="h-4 w-4" />
+            账号设置
+          </Link>
           <button
             type="button"
             disabled={pending}

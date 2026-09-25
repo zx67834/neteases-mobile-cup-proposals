@@ -1,6 +1,5 @@
 'use client';
 
-import { getCurrentModelConfig } from '@/lib/utils/model-config';
 import type {
   StudentLearningIntent,
   StudentLearningWorkflow,
@@ -10,22 +9,16 @@ import type {
 } from '@/lib/student-workflow/types';
 
 function modelHeaders(): HeadersInit {
-  const config = getCurrentModelConfig();
   return {
     'Content-Type': 'application/json',
-    'x-model': config.modelString,
-    'x-api-key': config.apiKey,
-    'x-base-url': config.baseUrl,
-    ...(config.providerType ? { 'x-provider-type': config.providerType } : {}),
   };
 }
 
 async function workflowRequest<T>(body: Record<string, unknown>, signal?: AbortSignal): Promise<T> {
-  const config = getCurrentModelConfig();
   const response = await fetch('/api/student/workflow', {
     method: 'POST',
     headers: modelHeaders(),
-    body: JSON.stringify({ ...body, thinkingConfig: config.thinkingConfig }),
+    body: JSON.stringify(body),
     signal,
   });
   const payload = (await response.json().catch(() => null)) as

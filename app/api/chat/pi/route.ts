@@ -22,7 +22,7 @@ import {
 } from '@/lib/chat/pi/config';
 import { runPiDirectorLoop } from '@/lib/chat/pi/director-loop';
 import type { SendEvent } from '@/lib/chat/pi/types';
-import { resolveModel } from '@/lib/server/resolve-model';
+import { resolveCampusChatModel, resolveModel } from '@/lib/server/resolve-model';
 import { apiError } from '@/lib/server/api-response';
 import type { ThinkingConfig } from '@/lib/types/provider';
 import type { StatelessChatRequest } from '@/lib/types/chat';
@@ -108,16 +108,25 @@ export async function POST(req: NextRequest) {
       providerId,
       modelInfo,
       thinkingConfig: resolvedThinkingConfig,
-    } = await resolveModel({
-      modelString: body.model,
-      stage: 'chat-adapter',
-      apiKey: body.apiKey,
-      baseUrl: body.baseUrl,
-      providerType: body.providerType,
-      // Let resolveModel arbitrate thinking too: a routed chat-adapter's thinking
-      // wins, an unrouted one honors this client thinking (see resolve-model.ts).
-      thinkingConfig: body.thinkingConfig ?? body.thinking,
-    });
+    } = await (req.headers.get('cookie')?.includes('openmaic_campus_session=')
+      ? resolveCampusChatModel(req, {
+          modelString: body.model,
+          stage: 'chat-adapter',
+          apiKey: body.apiKey,
+          baseUrl: body.baseUrl,
+          providerType: body.providerType,
+          thinkingConfig: body.thinkingConfig ?? body.thinking,
+        })
+      : resolveModel({
+          modelString: body.model,
+          stage: 'chat-adapter',
+          apiKey: body.apiKey,
+          baseUrl: body.baseUrl,
+          providerType: body.providerType,
+          // Let resolveModel arbitrate thinking too: a routed chat-adapter's thinking
+          // wins, an unrouted one honors this client thinking (see resolve-model.ts).
+          thinkingConfig: body.thinkingConfig ?? body.thinking,
+        }));
 
     if (isProviderKeyRequired(providerId) && !resolvedApiKey) {
       return apiError('MISSING_API_KEY', 401, 'API Key is required');

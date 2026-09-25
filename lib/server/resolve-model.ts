@@ -17,6 +17,7 @@ import {
 import { validateUrlForSSRF } from '@/lib/server/ssrf-guard';
 import { fetchWithRedirectValidation } from '@/lib/server/fetch-with-redirect-validation';
 import { getStageRoute, type LlmStage } from '@/lib/server/model-routes';
+import { currentCampusModelContext, withCampusModelContext } from '@/lib/auth/campus-model-context';
 
 export interface ResolvedModel extends ModelWithInfo {
   /** Original model string (e.g. "openai/gpt-4o-mini") */
@@ -53,6 +54,7 @@ export async function resolveModel(params: {
   providerType?: string;
   thinkingConfig?: ThinkingConfig;
 }): Promise<ResolvedModel> {
+  const campus = currentCampusModelContext();
   // Resolution order: stage route > x-model > DEFAULT_MODEL.
   // A configured stage route is the operator's deliberate per-stage choice and
   // wins even over a client-sent x-model (otherwise the browser UI, which always
@@ -62,7 +64,8 @@ export async function resolveModel(params: {
   // vendor default.
   const stageRoute = getStageRoute(params.stage);
   const stageModel = stageRoute?.model;
-  const modelString = stageModel || params.modelString || process.env.DEFAULT_MODEL;
+  const modelString =
+    campus?.modelString || stageModel || params.modelString || process.env.DEFAULT_MODEL;
   if (!modelString) {
     throw new Error(
       'No model could be resolved. Configure DEFAULT_MODEL (and/or a MODEL_ROUTES entry for this stage), or send a model via x-model.',
@@ -75,10 +78,10 @@ export async function resolveModel(params: {
   // and must not bleed onto the routed provider — otherwise e.g. a routed
   // Anthropic model would be built with the client's OpenAI providerType/key.
   // A routed model resolves purely from server config, as if no x-model was sent.
-  const routed = Boolean(stageModel);
+  const routed = !campus && Boolean(stageModel);
   const clientApiKey = routed ? undefined : params.apiKey;
-  const clientProviderType = routed ? undefined : params.providerType;
-  const clientBaseUrlParam = routed ? undefined : params.baseUrl;
+  const clientProviderType = routed || campus ? undefined : params.providerType;
+  const clientBaseUrlParam = routed || campus ? undefined : params.baseUrl;
 
   // Server-managed providers are admin-owned: the operator's key and base URL
   // are authoritative and any client-sent override is ignored. Origin URL
@@ -113,7 +116,7 @@ export async function resolveModel(params: {
     }
   }
 
-  const apiKey = resolveApiKey(providerId, clientApiKey || '');
+  const apiKey = campus?.apiKey ?? resolveApiKey(providerId, clientApiKey || '');
   const baseUrl = resolveBaseUrl(providerId, clientBaseUrl);
   const proxy = resolveProxy(providerId);
   const { model, modelInfo } = getModel({
@@ -170,6 +173,21 @@ export async function resolveModelFromHeaders(
   stage?: LlmStage,
   thinkingConfig?: ThinkingConfig,
 ): Promise<ResolvedModel> {
+  const { getCampusSessionFromRequest } = await import('@/lib/auth/campus-auth');
+  const session = await getCampusSessionFromRequest(req);
+  if (session && (session.role === 'teacher' || session.role === 'student')) {
+    const { getCampusModelSettings } = await import('@/lib/auth/campus-model-settings');
+    const settings = await getCampusModelSettings(session.id);
+    return withCampusModelContext(
+      { modelString: `${settings.providerId}/${settings.modelId}`, apiKey: settings.apiKey },
+      () =>
+        resolveModel({
+          modelString: req.headers.get('x-model') || undefined,
+          stage,
+          thinkingConfig,
+        }),
+    );
+  }
   return resolveModel({
     modelString: req.headers.get('x-model') || undefined,
     stage,
@@ -178,6 +196,23 @@ export async function resolveModelFromHeaders(
     providerType: req.headers.get('x-provider-type') || undefined,
     thinkingConfig,
   });
+}
+
+export async function resolveCampusChatModel(
+  req: NextRequest,
+  params: Parameters<typeof resolveModel>[0],
+): Promise<ResolvedModel> {
+  const { getCampusSessionFromRequest } = await import('@/lib/auth/campus-auth');
+  const session = await getCampusSessionFromRequest(req);
+  if (session && (session.role === 'teacher' || session.role === 'student')) {
+    const { getCampusModelSettings } = await import('@/lib/auth/campus-model-settings');
+    const settings = await getCampusModelSettings(session.id);
+    return withCampusModelContext(
+      { modelString: `${settings.providerId}/${settings.modelId}`, apiKey: settings.apiKey },
+      () => resolveModel(params),
+    );
+  }
+  return resolveModel(params);
 }
 
 /**

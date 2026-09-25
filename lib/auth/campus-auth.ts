@@ -15,6 +15,7 @@ export interface CampusUser {
   id: string;
   username: string;
   displayName: string;
+  realName: string;
   role: CampusRole;
   userKey: string;
 }
@@ -28,6 +29,7 @@ interface CampusUserRow extends Record<string, unknown> {
   id: string;
   username: string;
   display_name: string;
+  real_name: string;
   role: CampusRole;
   user_key: string;
 }
@@ -56,6 +58,7 @@ function mapUser(row: CampusUserRow): CampusUser {
     id: row.id,
     username: row.username,
     displayName: row.display_name,
+    realName: row.real_name,
     role: row.role,
     userKey: row.user_key,
   };
@@ -91,7 +94,7 @@ async function findSession(token: string | null): Promise<CampusSession | null> 
   const pool = await authPool();
   const result = await pool.query<CampusSessionRow>(
     `SELECT s.id AS session_id, s.expires_at,
-            u.id, u.username, u.display_name, u.role, u.user_key
+            u.id, u.username, u.display_name, u.real_name, u.role, u.user_key
        FROM campus_user_sessions s
        JOIN campus_users u ON u.id = s.user_id
       WHERE s.session_token = $1
@@ -122,16 +125,25 @@ export async function registerCampusUser(input: {
   username: string;
   password: string;
   displayName: string;
+  realName?: string;
   role: Exclude<CampusRole, 'admin'>;
 }): Promise<CampusUser> {
   const pool = await authPool();
   const id = `user_${randomBytes(12).toString('base64url')}`;
   const userKey = `campus:${input.role}:${randomBytes(18).toString('base64url')}`;
   const result = await pool.query<CampusUserRow>(
-    `INSERT INTO campus_users (id, username, password_hash, display_name, role, user_key)
-     VALUES ($1, $2, public.crypt($3, public.gen_salt('bf', 12)), $4, $5, $6)
-     RETURNING id, username, display_name, role, user_key`,
-    [id, input.username, input.password, input.displayName, input.role, userKey],
+    `INSERT INTO campus_users (id, username, password_hash, display_name, real_name, role, user_key)
+     VALUES ($1, $2, public.crypt($3, public.gen_salt('bf', 12)), $4, $5, $6, $7)
+     RETURNING id, username, display_name, real_name, role, user_key`,
+    [
+      id,
+      input.username,
+      input.password,
+      input.displayName,
+      input.realName ?? '',
+      input.role,
+      userKey,
+    ],
   );
   const user = mapUser(result.rows[0]);
   await pool.query(
@@ -142,6 +154,59 @@ export async function registerCampusUser(input: {
   return user;
 }
 
+export async function updateCampusProfile(
+  userId: string,
+  input: { username: string; displayName: string; realName: string },
+): Promise<CampusUser> {
+  const result = await (
+    await authPool()
+  ).query<CampusUserRow>(
+    `UPDATE campus_users
+        SET username = $2, display_name = $3, real_name = $4, updated_at = now()
+      WHERE id = $1 AND is_active = TRUE
+      RETURNING id, username, display_name, real_name, role, user_key`,
+    [userId, input.username, input.displayName, input.realName],
+  );
+  if (!result.rows[0]) throw new Error('ACCOUNT_NOT_FOUND');
+  return mapUser(result.rows[0]);
+}
+
+export async function changeCampusPassword(
+  userId: string,
+  sessionId: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<boolean> {
+  const pool = await authPool();
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await client.query(
+      `UPDATE campus_users
+          SET password_hash = public.crypt($3, public.gen_salt('bf', 12)), updated_at = now()
+        WHERE id = $1 AND password_hash = public.crypt($2, password_hash)
+        RETURNING id`,
+      [userId, currentPassword, newPassword],
+    );
+    if (!result.rowCount) {
+      await client.query('ROLLBACK');
+      return false;
+    }
+    await client.query(
+      `UPDATE campus_user_sessions SET revoked_at = now()
+        WHERE user_id = $1 AND id <> $2 AND revoked_at IS NULL`,
+      [userId, sessionId],
+    );
+    await client.query('COMMIT');
+    return true;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function verifyCampusCredentials(
   username: string,
   password: string,
@@ -149,7 +214,7 @@ export async function verifyCampusCredentials(
 ): Promise<CampusUser | null> {
   const pool = await authPool();
   const result = await pool.query<CampusUserRow>(
-    `SELECT id, username, display_name, role, user_key
+    `SELECT id, username, display_name, real_name, role, user_key
        FROM campus_users
       WHERE lower(username) = lower($1)
         AND is_active = TRUE

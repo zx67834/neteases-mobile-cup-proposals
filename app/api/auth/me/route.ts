@@ -11,6 +11,7 @@ export async function GET(request: Request) {
       id: session.id,
       username: session.username,
       displayName: session.displayName,
+      realName: session.realName,
       role: session.role,
     },
   });
