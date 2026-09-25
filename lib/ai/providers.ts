@@ -946,7 +946,7 @@ export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
         },
       },
       {
-        id: 'deepseek-v4-flash',
+        id: 'deepseek-flash',
         name: 'DeepSeek V4 Flash',
         contextWindow: 1048576,
         outputWindow: 393216,
@@ -954,22 +954,6 @@ export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
           streaming: true,
           tools: true,
           vision: false,
-          thinking: {
-            toggleable: true,
-            budgetAdjustable: true,
-            defaultEnabled: true,
-          },
-        },
-      },
-      {
-        id: 'deepseek-v4-flash-vision-exp',
-        name: 'DeepSeek V4 Flash Vision (Exp)',
-        contextWindow: 1048576,
-        outputWindow: 393216,
-        capabilities: {
-          streaming: true,
-          tools: true,
-          vision: true,
           thinking: {
             toggleable: true,
             budgetAdjustable: true,

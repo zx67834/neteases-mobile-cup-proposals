@@ -55,6 +55,14 @@ interface ProviderConfigPanelProps {
   modelsUrl?: string;
   onResetToDefault?: () => void; // Reset provider to default configuration
   isBuiltIn: boolean; // To determine if reset button should be shown
+  verifyEndpoint?: string;
+  hasStoredApiKey?: boolean;
+  hasAvailableApiKey?: boolean;
+  selectedModelId?: string;
+  onSelectModel?: (modelId: string) => void;
+  modelsReadOnly?: boolean;
+  showBaseUrl?: boolean;
+  showRequiresApiKeyToggle?: boolean;
 }
 
 export function ProviderConfigPanel({
@@ -72,6 +80,14 @@ export function ProviderConfigPanel({
   modelsUrl,
   onResetToDefault,
   isBuiltIn,
+  verifyEndpoint = '/api/verify-model',
+  hasStoredApiKey = false,
+  hasAvailableApiKey = hasStoredApiKey,
+  selectedModelId,
+  onSelectModel,
+  modelsReadOnly = false,
+  showBaseUrl = true,
+  showRequiresApiKeyToggle = true,
 }: ProviderConfigPanelProps) {
   const { t } = useI18n();
 
@@ -133,18 +149,26 @@ export function ProviderConfigPanel({
     const testModelId = availableModels[0].id;
 
     try {
-      const response = await fetch('/api/verify-model', {
+      const response = await fetch(verifyEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(
-          createVerifyModelRequest({
-            providerId: provider.id,
-            modelId: testModelId,
-            apiKey,
-            baseUrl,
-            providerType: provider.type,
-            requiresApiKey,
-          }),
+          verifyEndpoint === '/api/auth/account/verify-model'
+            ? {
+                providerId: provider.id,
+                modelId: selectedModelId || testModelId,
+                apiKey,
+                baseUrl,
+                providerType: provider.type,
+              }
+            : createVerifyModelRequest({
+                providerId: provider.id,
+                modelId: testModelId,
+                apiKey,
+                baseUrl,
+                providerType: provider.type,
+                requiresApiKey,
+              }),
         ),
       });
 
@@ -161,7 +185,17 @@ export function ProviderConfigPanel({
       setTestStatus('error');
       setTestMessage(t('settings.connectionFailed'));
     }
-  }, [apiKey, baseUrl, provider.id, provider.type, requiresApiKey, providersConfig, t]);
+  }, [
+    apiKey,
+    baseUrl,
+    provider.id,
+    provider.type,
+    requiresApiKey,
+    providersConfig,
+    selectedModelId,
+    t,
+    verifyEndpoint,
+  ]);
 
   const effectiveBaseUrl = baseUrl || provider.defaultBaseUrl || '';
 
@@ -206,7 +240,7 @@ export function ProviderConfigPanel({
   // When the operator pins an allowed model list (MODELS env/yaml), the model
   // catalog is admin-managed too — view-only, no add/edit/delete. Without a
   // pinned list the server manages only credentials and the user curates models.
-  const modelsLocked = !!providersConfig[provider.id]?.serverModels?.length;
+  const modelsLocked = modelsReadOnly || !!providersConfig[provider.id]?.serverModels?.length;
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -233,7 +267,7 @@ export function ProviderConfigPanel({
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
-                  placeholder="sk-..."
+                  placeholder={hasStoredApiKey ? '已安全保存；留空保持不变' : 'sk-...'}
                   value={apiKey}
                   onChange={(e) => handleApiKeyChange(e.target.value)}
                   onBlur={onSave}
@@ -253,7 +287,9 @@ export function ProviderConfigPanel({
                 variant="outline"
                 size="sm"
                 onClick={handleTestApi}
-                disabled={testStatus === 'testing' || (requiresApiKey && !apiKey)}
+                disabled={
+                  testStatus === 'testing' || (requiresApiKey && !apiKey && !hasAvailableApiKey)
+                }
                 className="gap-1.5"
               >
                 {testStatus === 'testing' ? (
@@ -281,101 +317,105 @@ export function ProviderConfigPanel({
                 </div>
               </div>
             )}
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id={`requires-api-key-${provider.id}`}
-                checked={requiresApiKey}
-                onCheckedChange={(checked) => {
-                  handleRequiresApiKeyChange(checked as boolean);
-                  onSave();
-                }}
-              />
-              <label
-                htmlFor={`requires-api-key-${provider.id}`}
-                className="text-sm cursor-pointer text-muted-foreground"
-              >
-                {t('settings.requiresApiKey')}
-              </label>
-            </div>
+            {showRequiresApiKeyToggle && (
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id={`requires-api-key-${provider.id}`}
+                  checked={requiresApiKey}
+                  onCheckedChange={(checked) => {
+                    handleRequiresApiKeyChange(checked as boolean);
+                    onSave();
+                  }}
+                />
+                <label
+                  htmlFor={`requires-api-key-${provider.id}`}
+                  className="text-sm cursor-pointer text-muted-foreground"
+                >
+                  {t('settings.requiresApiKey')}
+                </label>
+              </div>
+            )}
           </div>
 
           {/* API Host */}
-          <div className="space-y-2">
-            <Label>{t('settings.apiHost')}</Label>
-            <Input
-              name={`llm-base-url-${provider.id}`}
-              type="url"
-              autoComplete="off"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              placeholder={
-                provider.baseUrlPlaceholder ||
-                provider.defaultBaseUrl ||
-                'https://api.example.com/v1'
-              }
-              value={baseUrl}
-              onChange={(e) => handleBaseUrlChange(e.target.value)}
-              onBlur={onSave}
-              className="h-8"
-            />
-            {provider.alternateBaseUrls && provider.alternateBaseUrls.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5">
-                {provider.alternateBaseUrls.map((alt) => {
-                  const active = (baseUrl || provider.defaultBaseUrl) === alt.url;
-                  return (
-                    <button
-                      key={alt.url}
-                      type="button"
-                      onClick={() => {
-                        handleBaseUrlChange(alt.url);
-                        onSave();
-                      }}
-                      className={cn(
-                        'px-2 py-0.5 text-xs rounded-md border transition-colors',
-                        active
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-background text-muted-foreground border-border hover:bg-muted',
-                      )}
-                    >
-                      {t(alt.label)}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            {(() => {
-              const effectiveBaseUrl = baseUrl || provider.defaultBaseUrl || '';
-              if (!effectiveBaseUrl) return null;
+          {showBaseUrl && (
+            <div className="space-y-2">
+              <Label>{t('settings.apiHost')}</Label>
+              <Input
+                name={`llm-base-url-${provider.id}`}
+                type="url"
+                autoComplete="off"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                placeholder={
+                  provider.baseUrlPlaceholder ||
+                  provider.defaultBaseUrl ||
+                  'https://api.example.com/v1'
+                }
+                value={baseUrl}
+                onChange={(e) => handleBaseUrlChange(e.target.value)}
+                onBlur={onSave}
+                className="h-8"
+              />
+              {provider.alternateBaseUrls && provider.alternateBaseUrls.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {provider.alternateBaseUrls.map((alt) => {
+                    const active = (baseUrl || provider.defaultBaseUrl) === alt.url;
+                    return (
+                      <button
+                        key={alt.url}
+                        type="button"
+                        onClick={() => {
+                          handleBaseUrlChange(alt.url);
+                          onSave();
+                        }}
+                        className={cn(
+                          'px-2 py-0.5 text-xs rounded-md border transition-colors',
+                          active
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-background text-muted-foreground border-border hover:bg-muted',
+                        )}
+                      >
+                        {t(alt.label)}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {(() => {
+                const effectiveBaseUrl = baseUrl || provider.defaultBaseUrl || '';
+                if (!effectiveBaseUrl) return null;
 
-              // Generate endpoint path based on provider type
-              let endpointPath = '';
-              switch (provider.type) {
-                case 'openai':
-                  endpointPath = '/chat/completions';
-                  break;
-                case 'azure':
-                  endpointPath = '/v1/responses?api-version=v1';
-                  break;
-                case 'anthropic':
-                  endpointPath = '/messages';
-                  break;
-                case 'google':
-                  endpointPath = '/models/[model]';
-                  break;
-                default:
-                  endpointPath = '';
-              }
+                // Generate endpoint path based on provider type
+                let endpointPath = '';
+                switch (provider.type) {
+                  case 'openai':
+                    endpointPath = '/chat/completions';
+                    break;
+                  case 'azure':
+                    endpointPath = '/v1/responses?api-version=v1';
+                    break;
+                  case 'anthropic':
+                    endpointPath = '/messages';
+                    break;
+                  case 'google':
+                    endpointPath = '/models/[model]';
+                    break;
+                  default:
+                    endpointPath = '';
+                }
 
-              const fullUrl = effectiveBaseUrl + endpointPath;
+                const fullUrl = effectiveBaseUrl + endpointPath;
 
-              return (
-                <p className="text-xs text-muted-foreground break-all">
-                  {t('settings.requestUrl')}: {fullUrl}
-                </p>
-              );
-            })()}
-          </div>
+                return (
+                  <p className="text-xs text-muted-foreground break-all">
+                    {t('settings.requestUrl')}: {fullUrl}
+                  </p>
+                );
+              })()}
+            </div>
+          )}
         </>
       )}
 
@@ -450,7 +490,20 @@ export function ProviderConfigPanel({
             return (
               <div
                 key={model.id}
-                className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-card"
+                onClick={() => onSelectModel?.(model.id)}
+                onKeyDown={(event) => {
+                  if (onSelectModel && (event.key === 'Enter' || event.key === ' ')) {
+                    event.preventDefault();
+                    onSelectModel(model.id);
+                  }
+                }}
+                role={onSelectModel ? 'button' : undefined}
+                tabIndex={onSelectModel ? 0 : undefined}
+                className={cn(
+                  'flex w-full items-center justify-between p-3 rounded-lg border bg-card text-left',
+                  selectedModelId === model.id ? 'border-primary bg-primary/5' : 'border-border/50',
+                  onSelectModel && 'cursor-pointer hover:border-primary/50',
+                )}
               >
                 <div className="flex-1">
                   <div className="font-mono text-sm font-medium mb-1.5">{model.name}</div>
@@ -495,6 +548,18 @@ export function ProviderConfigPanel({
                 </div>
 
                 {/* Edit/Delete Buttons — hidden when the model catalog is server-managed */}
+                {onSelectModel && (
+                  <span
+                    aria-hidden
+                    className={cn(
+                      'mr-2 h-4 w-4 shrink-0 rounded-full border-2',
+                      selectedModelId === model.id
+                        ? 'border-primary bg-primary shadow-[inset_0_0_0_3px_white]'
+                        : 'border-muted-foreground/50',
+                    )}
+                  />
+                )}
+
                 {!modelsLocked && (
                   <div className="flex items-center gap-1">
                     <Button

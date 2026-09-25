@@ -4,13 +4,9 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 
 import { getServerPersistenceProvider } from '@/lib/persistence/server-provider';
 
-export const CAMPUS_DEEPSEEK_MODELS = [
-  'deepseek-v4-flash',
-  'deepseek-v4-pro',
-  'deepseek-v4-flash-vision-exp',
-] as const;
+export const CAMPUS_DEEPSEEK_MODELS = ['deepseek-flash', 'deepseek-v4-pro'] as const;
 export type CampusDeepSeekModel = (typeof CAMPUS_DEEPSEEK_MODELS)[number];
-export const DEFAULT_CAMPUS_MODEL: CampusDeepSeekModel = 'deepseek-v4-flash';
+export const DEFAULT_CAMPUS_MODEL: CampusDeepSeekModel = 'deepseek-flash';
 
 type SettingsRow = {
   model_id: string;

@@ -173,11 +173,7 @@ export async function POST(request: Request) {
             files: payload.files,
           });
         } catch (e) {
-          return apiError(
-            'INVALID_REQUEST',
-            400,
-            e instanceof Error ? e.message : '文件上传失败',
-          );
+          return apiError('INVALID_REQUEST', 400, e instanceof Error ? e.message : '文件上传失败');
         }
       }
 
@@ -201,6 +197,7 @@ export async function POST(request: Request) {
       if (session.role !== 'student') return apiError('FORBIDDEN', 403, '仅学生可用');
       const start = payload.startDate || new Date().toISOString().slice(0, 10);
       const raw = await campusToolsChat(
+        session.id,
         `你是学习计划助手。输出按天拆分的学习目标，禁止 Markdown。
 格式要求：每行一条，优先写成「YYYY-MM-DD 目标」；若是贯穿整段时间的长期目标，写成「每日 目标」。
 共 5～10 条，中文，简短可执行。从 ${start} 起排。不要额外说明。`,
@@ -218,10 +215,6 @@ export async function POST(request: Request) {
     return apiError('INVALID_REQUEST', 400, '未知操作');
   } catch (error) {
     console.error('[campus/tools/checkin POST]', error);
-    return apiError(
-      'INTERNAL_ERROR',
-      500,
-      error instanceof Error ? error.message : '打卡操作失败',
-    );
+    return apiError('INTERNAL_ERROR', 500, error instanceof Error ? error.message : '打卡操作失败');
   }
 }

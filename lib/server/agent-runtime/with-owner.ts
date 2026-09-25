@@ -24,7 +24,7 @@ export async function withRequestOwnerId(
       const { getCampusModelSettings } = await import('@/lib/auth/campus-model-settings');
       const settings = await getCampusModelSettings(session.id);
       return await withCampusModelContext(
-        { modelString: `${settings.providerId}/${settings.modelId}`, apiKey: settings.apiKey },
+        { modelString: `${settings.providerId}:${settings.modelId}`, apiKey: settings.apiKey },
         () => handler(ownerId, responseHeaders),
       );
     }

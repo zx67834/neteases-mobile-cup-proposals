@@ -75,7 +75,7 @@ const fieldClass =
 
 /** Classroom slides often embed HTML / LaTeX / theme colors — keep only teaching text. */
 function sanitizeTeachingText(raw: string): string {
-  let text = raw
+  const text = raw
     .replace(/\r\n/g, '\n')
     // Drop style blocks and tags first
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
@@ -90,7 +90,10 @@ function sanitizeTeachingText(raw: string): string {
     // Theme / design noise from slide JSON
     .replace(/#[0-9a-fA-F]{3,8}\b/g, ' ')
     .replace(/\b(?:rgb|rgba|hsl|hsla)\([^)]*\)/gi, ' ')
-    .replace(/\b(?:font-size|text-align|font-weight|line-height|background|color)\s*:[^;\n]*/gi, ' ')
+    .replace(
+      /\b(?:font-size|text-align|font-weight|line-height|background|color)\s*:[^;\n]*/gi,
+      ' ',
+    )
     .replace(/\b(?:px|rem|em|vw|vh)\b/gi, ' ')
     // Soften common LaTeX into readable math (keep meaning for 出题)
     .replace(/\\forall/g, '任意')
@@ -252,16 +255,16 @@ export function QuizBuilderTool() {
     setTitle(course.name);
     setLoadingClassroom(true);
     try {
-      const res = await fetch(`/api/stages/${encodeURIComponent(course.id)}`, { cache: 'no-store' });
+      const res = await fetch(`/api/stages/${encodeURIComponent(course.id)}`, {
+        cache: 'no-store',
+      });
       if (res.ok) {
         const doc = await res.json();
         const extracted = extractClassroomSource(doc, course.name, course.description);
         setSourceText(extracted);
         toast.success(`已载入课题「${course.name}」内容`);
       } else {
-        setSourceText(
-          extractClassroomSource(null, course.name, course.description),
-        );
+        setSourceText(extractClassroomSource(null, course.name, course.description));
         toast.message('已选题，课堂正文暂不可读，将用课题名与简介出题');
       }
     } catch {
@@ -343,9 +346,7 @@ export function QuizBuilderTool() {
       return;
     }
     toast.success(
-      action === 'publish'
-        ? '已下发，学生可在「我的练习」作答'
-        : '已退回下发，学生端不再显示',
+      action === 'publish' ? '已下发，学生可在「我的练习」作答' : '已退回下发，学生端不再显示',
     );
     await load();
   }
@@ -440,7 +441,10 @@ export function QuizBuilderTool() {
           />
           <ol className="space-y-4 text-sm">
             {questions.map((q, i) => (
-              <li key={i} className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 dark:border-white/10 dark:bg-white/5">
+              <li
+                key={i}
+                className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 dark:border-white/10 dark:bg-white/5"
+              >
                 <p className="font-medium leading-7 text-slate-800 dark:text-slate-100">
                   <span className="mr-2 inline-flex rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-700 dark:bg-violet-500/20 dark:text-violet-300">
                     {typeLabel(q.qtype)}
@@ -479,9 +483,7 @@ export function QuizBuilderTool() {
                     {q.options.map((o) => (
                       <li
                         key={o}
-                        className={
-                          o === q.answer ? 'font-medium text-violet-700' : undefined
-                        }
+                        className={o === q.answer ? 'font-medium text-violet-700' : undefined}
                       >
                         {o}
                         {o === q.answer ? ' ✓' : ''}

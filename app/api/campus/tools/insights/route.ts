@@ -133,11 +133,7 @@ export async function POST(request: Request) {
 
   if (body?.action === 'recall_submission') {
     if (session.role !== 'teacher') return apiError('FORBIDDEN', 403, '仅教师可退回提交');
-    const ok = await recallSubmissionForTeacher(
-      pool,
-      session.id,
-      String(body.submissionId || ''),
-    );
+    const ok = await recallSubmissionForTeacher(pool, session.id, String(body.submissionId || ''));
     if (!ok) return apiError('NOT_FOUND', 404, '提交不存在');
     return apiSuccess({ recalled: true });
   }
@@ -153,6 +149,7 @@ export async function POST(request: Request) {
       Array.isArray(body.submissionIds) ? body.submissionIds.map(String) : undefined,
       async ({ studentAnswer, referenceAnswer }) => {
         const raw = await campusToolsChat(
+          session.id,
           '你是开放性简答批改助手。只根据「参考要点/评分模板」评估学生作答（非唯一解题目）。返回 JSON：{"score":0-100,"feedback":"评语与改进建议"}。不要要求与参考原文逐字一致。',
           `评分要点模板：${referenceAnswer || '观点明确、论据充分、表达清晰'}\n学生作答：${studentAnswer}`,
           { json: true },

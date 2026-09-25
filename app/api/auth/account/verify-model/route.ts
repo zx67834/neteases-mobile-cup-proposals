@@ -44,8 +44,8 @@ export async function POST(request: Request) {
     const apiKey = candidateKey || saved.apiKey;
     if (!apiKey) return apiError('MISSING_API_KEY', 400, '请先填写或保存 API Key');
     const result = await withCampusModelContext(
-      { modelString: `deepseek/${modelId}`, apiKey },
-      () => resolveModel({ modelString: `deepseek/${modelId}` }),
+      { modelString: `deepseek:${modelId}`, apiKey },
+      () => resolveModel({ modelString: `deepseek:${modelId}` }),
     );
     await callLLM(
       { model: result.model, prompt: 'Reply with OK.', maxOutputTokens: 32 },

@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Grid3X3, X } from 'lucide-react';
@@ -309,10 +308,7 @@ export function PracticeSession({ quizId }: { quizId: string }) {
               <p className="text-sm text-slate-400">正在进入做题页…</p>
             </ToolCard>
           ) : finished ? (
-            <div
-              key={`done-${animKey}`}
-              className="animate-[practice-slide-in_0.32s_ease-out]"
-            >
+            <div key={`done-${animKey}`} className="animate-[practice-slide-in_0.32s_ease-out]">
               <ToolCard>
                 <h2 className="text-xl font-bold text-slate-900 dark:text-slate-50">
                   {result ? '交卷结果' : '全部题目已答完'}
@@ -320,9 +316,7 @@ export function PracticeSession({ quizId }: { quizId: string }) {
                 {result ? (
                   <p className="mt-3 text-sm leading-7 text-violet-700">
                     得分 {result.score}/{result.maxScore}
-                    {result.feedback?.length
-                      ? ` · ${result.feedback.join('；')}`
-                      : ' · 全部正确'}
+                    {result.feedback?.length ? ` · ${result.feedback.join('；')}` : ' · 全部正确'}
                   </p>
                 ) : (
                   <p className="mt-3 text-sm text-slate-500">
@@ -444,9 +438,7 @@ export function PracticeSession({ quizId }: { quizId: string }) {
                           : '请填写唯一标准答案…'
                       }
                       value={answers[current.id] || ''}
-                      onChange={(e) =>
-                        setAnswers((a) => ({ ...a, [current.id]: e.target.value }))
-                      }
+                      onChange={(e) => setAnswers((a) => ({ ...a, [current.id]: e.target.value }))}
                     />
                     <div className="mt-4 flex justify-end">
                       <PrimaryButton

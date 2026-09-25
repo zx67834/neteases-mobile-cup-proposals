@@ -179,7 +179,7 @@ export async function resolveModelFromHeaders(
     const { getCampusModelSettings } = await import('@/lib/auth/campus-model-settings');
     const settings = await getCampusModelSettings(session.id);
     return withCampusModelContext(
-      { modelString: `${settings.providerId}/${settings.modelId}`, apiKey: settings.apiKey },
+      { modelString: `${settings.providerId}:${settings.modelId}`, apiKey: settings.apiKey },
       () =>
         resolveModel({
           modelString: req.headers.get('x-model') || undefined,
@@ -208,7 +208,7 @@ export async function resolveCampusChatModel(
     const { getCampusModelSettings } = await import('@/lib/auth/campus-model-settings');
     const settings = await getCampusModelSettings(session.id);
     return withCampusModelContext(
-      { modelString: `${settings.providerId}/${settings.modelId}`, apiKey: settings.apiKey },
+      { modelString: `${settings.providerId}:${settings.modelId}`, apiKey: settings.apiKey },
       () => resolveModel(params),
     );
   }

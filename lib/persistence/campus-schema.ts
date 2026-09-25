@@ -25,10 +25,15 @@ const CAMPUS_SCHEMA_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS campus_user_model_settings (
     user_id TEXT PRIMARY KEY REFERENCES campus_users(id) ON DELETE CASCADE,
     provider_id TEXT NOT NULL DEFAULT 'deepseek',
-    model_id TEXT NOT NULL DEFAULT 'deepseek-v4-flash',
+    model_id TEXT NOT NULL DEFAULT 'deepseek-flash',
     api_key_ciphertext TEXT,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`,
+  `ALTER TABLE campus_user_model_settings
+    ALTER COLUMN model_id SET DEFAULT 'deepseek-flash'`,
+  `UPDATE campus_user_model_settings
+    SET model_id = 'deepseek-flash', updated_at = now()
+    WHERE model_id IN ('deepseek-v4-flash', 'deepseek-v4-flash-vision-exp')`,
   `ALTER TABLE campus_user_model_settings
     DROP CONSTRAINT IF EXISTS campus_user_model_settings_provider_id_check`,
   `CREATE TABLE IF NOT EXISTS campus_user_sessions (

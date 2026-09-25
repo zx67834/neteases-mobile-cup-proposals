@@ -2,26 +2,10 @@
 
 import Link from 'next/link';
 import { useEffect, useState, type FormEvent } from 'react';
-import {
-  ArrowLeft,
-  BookOpen,
-  CheckCircle2,
-  Eye,
-  EyeOff,
-  KeyRound,
-  Loader2,
-  LockKeyhole,
-  Save,
-  UserRound,
-  XCircle,
-  Zap,
-} from 'lucide-react';
-
-const DEEPSEEK_MODELS = [
-  { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', vision: false },
-  { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', vision: false },
-  { id: 'deepseek-v4-flash-vision-exp', name: 'DeepSeek V4 Flash Vision (Exp)', vision: true },
-] as const;
+import { ArrowLeft, BookOpen, LockKeyhole, Save, UserRound } from 'lucide-react';
+import { ProviderConfigPanel } from '@/components/settings/provider-config-panel';
+import { PROVIDERS } from '@/lib/ai/providers';
+import type { ProvidersConfig } from '@/lib/types/settings';
 
 type AccountData = {
   user: { username: string; displayName: string; realName: string; role: string };
@@ -36,11 +20,8 @@ type AccountData = {
 export function AccountSettings() {
   const [data, setData] = useState<AccountData | null>(null);
   const [apiKey, setApiKey] = useState('');
-  const [modelId, setModelId] = useState('deepseek-v4-flash');
+  const [modelId, setModelId] = useState('deepseek-flash');
   const [section, setSection] = useState<'profile' | 'model'>('model');
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
-  const [testMessage, setTestMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
 
@@ -95,25 +76,6 @@ export function AccountSettings() {
     void save('model', { modelId, apiKey });
   }
 
-  async function testModel() {
-    setTestStatus('testing');
-    setTestMessage('');
-    try {
-      const response = await fetch('/api/auth/account/verify-model', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ modelId, apiKey }),
-      });
-      const result = (await response.json()) as { error?: string; message?: string };
-      if (!response.ok) throw new Error(result.error || result.message || '连接失败');
-      setTestStatus('success');
-      setTestMessage(result.message || '连接成功');
-    } catch (error) {
-      setTestStatus('error');
-      setTestMessage(error instanceof Error ? error.message : '连接失败');
-    }
-  }
-
   function submitPassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formElement = event.currentTarget;
@@ -137,6 +99,20 @@ export function AccountSettings() {
       : data?.user.role === 'admin'
         ? '/admin'
         : '/student';
+  const deepseekProvider = PROVIDERS.deepseek;
+  const deepseekConfig = {
+    deepseek: {
+      apiKey,
+      baseUrl: '',
+      models: deepseekProvider.models,
+      name: deepseekProvider.name,
+      type: deepseekProvider.type,
+      defaultBaseUrl: deepseekProvider.defaultBaseUrl,
+      icon: deepseekProvider.icon,
+      requiresApiKey: deepseekProvider.requiresApiKey,
+      isBuiltIn: true,
+    },
+  } as ProvidersConfig;
 
   return (
     <main className="min-h-screen bg-[#f6f8fd] px-5 py-8 text-slate-900 dark:bg-[#071023] dark:text-slate-100">
@@ -323,107 +299,27 @@ export function AccountSettings() {
                         : '目前尚无可用 Key，请填入你自己的 Key。'}
                   </p>
                   <div className="mt-7">
-                    <label className="text-sm font-semibold">API Key</label>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <div className="relative min-w-[220px] flex-1">
-                        <input
-                          type={showApiKey ? 'text' : 'password'}
-                          value={apiKey}
-                          onChange={(event) => {
-                            setApiKey(event.target.value);
-                            setTestStatus('idle');
-                            setTestMessage('');
-                          }}
-                          autoComplete="new-password"
-                          autoCapitalize="none"
-                          autoCorrect="off"
-                          spellCheck={false}
-                          placeholder={
-                            data.model.hasPersonalKey
-                              ? '已设置；留空保持不变'
-                              : 'sk-…；留空使用测试 Key'
-                          }
-                          className="w-full rounded-xl border border-slate-200 bg-transparent px-4 py-3 pr-12 dark:border-white/15"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowApiKey(!showApiKey)}
-                          aria-label={showApiKey ? '隐藏密钥' : '显示密钥'}
-                          className="absolute right-3 top-3.5 text-slate-400"
-                        >
-                          {showApiKey ? (
-                            <EyeOff className="h-5 w-5" />
-                          ) : (
-                            <Eye className="h-5 w-5" />
-                          )}
-                        </button>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => void testModel()}
-                        disabled={
-                          busy ||
-                          testStatus === 'testing' ||
-                          (!apiKey && !data.model.hasAvailableKey)
-                        }
-                        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium disabled:opacity-50 dark:border-white/15"
-                      >
-                        {testStatus === 'testing' ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Zap className="h-4 w-4" />
-                        )}{' '}
-                        测试连接
-                      </button>
-                    </div>
-                    {testMessage ? (
-                      <p
-                        role="status"
-                        className={`mt-3 flex items-center gap-2 rounded-xl px-3 py-2 text-sm ${testStatus === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}
-                      >
-                        {testStatus === 'success' ? (
-                          <CheckCircle2 className="h-4 w-4" />
-                        ) : (
-                          <XCircle className="h-4 w-4" />
-                        )}
-                        {testMessage}
-                      </p>
-                    ) : null}
-                  </div>
-                  <p className="mt-3 flex items-center gap-1 text-xs text-slate-500">
-                    <KeyRound className="h-3 w-3" />{' '}
-                    密钥只在保存或测试时发送给服务端，页面不会回显。
-                  </p>
-                  <div className="mt-8 border-t border-slate-100 pt-6 dark:border-white/10">
-                    <h3 className="font-semibold">模型</h3>
-                    <p className="mt-1 text-xs text-slate-500">
-                      教师备课建议 V4 Pro，学生快速答疑建议 V4 Flash；你也可以自行切换。
-                    </p>
-                    <div className="mt-4 space-y-2">
-                      {DEEPSEEK_MODELS.map((model) => (
-                        <button
-                          key={model.id}
-                          type="button"
-                          onClick={() => {
-                            setModelId(model.id);
-                            setTestStatus('idle');
-                            setTestMessage('');
-                          }}
-                          className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left text-sm ${modelId === model.id ? 'border-violet-400 bg-violet-50 dark:bg-violet-500/15' : 'border-slate-200 hover:border-violet-200 dark:border-white/15'}`}
-                        >
-                          <span>
-                            <span className="font-medium">{model.name}</span>
-                            <span className="mt-1 block text-xs text-slate-500">
-                              1M 上下文 · 支持工具与流式输出
-                              {model.vision ? ' · 支持视觉（实验）' : ''}
-                            </span>
-                          </span>
-                          <span
-                            className={`h-4 w-4 shrink-0 rounded-full border-2 ${modelId === model.id ? 'border-violet-600 bg-violet-600 shadow-[inset_0_0_0_3px_white]' : 'border-slate-300'}`}
-                          />
-                        </button>
-                      ))}
-                    </div>
+                    <ProviderConfigPanel
+                      provider={deepseekProvider}
+                      initialApiKey={apiKey}
+                      initialBaseUrl=""
+                      initialRequiresApiKey
+                      providersConfig={deepseekConfig}
+                      onConfigChange={(nextApiKey) => setApiKey(nextApiKey)}
+                      onSave={() => undefined}
+                      onEditModel={() => undefined}
+                      onDeleteModel={() => undefined}
+                      onAddModel={() => undefined}
+                      isBuiltIn
+                      verifyEndpoint="/api/auth/account/verify-model"
+                      hasStoredApiKey={data.model.hasPersonalKey}
+                      hasAvailableApiKey={data.model.hasAvailableKey}
+                      selectedModelId={modelId}
+                      onSelectModel={setModelId}
+                      modelsReadOnly
+                      showBaseUrl={false}
+                      showRequiresApiKeyToggle={false}
+                    />
                   </div>
                   <div className="mt-7 flex flex-wrap gap-3 border-t border-slate-100 pt-5 dark:border-white/10">
                     <button

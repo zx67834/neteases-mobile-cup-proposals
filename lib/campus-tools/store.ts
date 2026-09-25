@@ -125,7 +125,7 @@ export async function publishQuiz(pool: Pool, teacherId: string, quizId: string)
       RETURNING id`,
     [quizId, teacherId],
   );
-  return result.rowCount > 0;
+  return (result.rowCount ?? 0) > 0;
 }
 
 /** Recall a published quiz so students no longer see it in 我的练习. */
@@ -241,16 +241,7 @@ export async function submitQuizAnswers(
        feedback = EXCLUDED.feedback,
        status = EXCLUDED.status,
        graded_at = now()`,
-    [
-      submissionId,
-      quizId,
-      student.id,
-      JSON.stringify(answers),
-      score,
-      maxScore,
-      feedback,
-      status,
-    ],
+    [submissionId, quizId, student.id, JSON.stringify(answers), score, maxScore, feedback, status],
   );
   return { score, maxScore, feedback: feedbackParts, status, openCount };
 }
@@ -411,10 +402,9 @@ export async function reviewRedoRequest(
   if (!owned.rows[0]) return false;
 
   if (approve) {
-    const del = await pool.query(
-      `DELETE FROM campus_tool_submissions WHERE id = $1 RETURNING id`,
-      [submissionId],
-    );
+    const del = await pool.query(`DELETE FROM campus_tool_submissions WHERE id = $1 RETURNING id`, [
+      submissionId,
+    ]);
     return (del.rowCount ?? 0) > 0;
   }
 
@@ -491,8 +481,7 @@ export async function batchGradeOpenSubmissions(
       try {
         const studentAnswer = opens
           .map(
-            (it, i) =>
-              `开放题${i + 1}：${it.prompt}\n学生作答：${it.studentAnswer || '（空白）'}`,
+            (it, i) => `开放题${i + 1}：${it.prompt}\n学生作答：${it.studentAnswer || '（空白）'}`,
           )
           .join('\n\n');
         const referenceAnswer = opens
@@ -824,10 +813,9 @@ export async function insightsTeacherStudentDetail(
   teacherId: string,
   studentId: string,
 ) {
-  const profile = await pool.query(
-    `SELECT id, display_name FROM campus_users WHERE id = $1`,
-    [studentId],
-  );
+  const profile = await pool.query(`SELECT id, display_name FROM campus_users WHERE id = $1`, [
+    studentId,
+  ]);
   if (!profile.rows[0]) return null;
 
   const quizzes = await pool.query(
@@ -855,9 +843,7 @@ export async function insightsTeacherStudentDetail(
     .map((r) => (Number(r.max_score) > 0 ? Number(r.score) / Number(r.max_score) : 0))
     .filter((n) => Number.isFinite(n));
   const avgAccuracy =
-    accuracies.length > 0
-      ? accuracies.reduce((a, b) => a + b, 0) / accuracies.length
-      : 0;
+    accuracies.length > 0 ? accuracies.reduce((a, b) => a + b, 0) / accuracies.length : 0;
   const bestAccuracy = accuracies.length ? Math.max(...accuracies) : 0;
 
   let level = '尚未练习';
@@ -930,9 +916,7 @@ export async function insightsForStudent(pool: Pool, studentId: string) {
     .map((r) => (Number(r.max_score) > 0 ? Number(r.score) / Number(r.max_score) : 0))
     .filter((n) => Number.isFinite(n));
   const avgAccuracy =
-    accuracies.length > 0
-      ? accuracies.reduce((a, b) => a + b, 0) / accuracies.length
-      : 0;
+    accuracies.length > 0 ? accuracies.reduce((a, b) => a + b, 0) / accuracies.length : 0;
   const bestAccuracy = accuracies.length ? Math.max(...accuracies) : 0;
   const recent = accuracies.slice(0, 8).reverse(); // oldest→newest for sparkline among latest
   const oralRows = oral.rows as Array<{ score: number }>;
@@ -1097,9 +1081,7 @@ async function studentPlanCompletion(pool: Pool, studentId: string) {
       LIMIT 1`,
     [studentId],
   );
-  const row = plan.rows[0] as
-    | { id: string; start_date: string; end_date: string }
-    | undefined;
+  const row = plan.rows[0] as { id: string; start_date: string; end_date: string } | undefined;
   if (!row) return { planCompletion: 0, hasActivePlan: false, itemCount: 0 };
 
   const items = await pool.query(
@@ -1113,10 +1095,7 @@ async function studentPlanCompletion(pool: Pool, studentId: string) {
   const end = new Date(asYmd(row.end_date));
   const today = new Date(todayYmd());
   const last = today < end ? today : end;
-  const days = Math.max(
-    1,
-    Math.floor((last.getTime() - start.getTime()) / 86400000) + 1,
-  );
+  const days = Math.max(1, Math.floor((last.getTime() - start.getTime()) / 86400000) + 1);
   const expected = itemCount * days;
   const done = await pool.query(
     `SELECT count(*)::int AS total
@@ -1207,9 +1186,7 @@ export async function createLearningPlan(
 ) {
   const start = parseYmd(input.startDate, 0);
   const end = parseYmd(input.endDate, 6);
-  const parsed = input.items
-    .map((line) => parsePlanItemLine(line, start))
-    .filter((x) => x.title);
+  const parsed = input.items.map((line) => parsePlanItemLine(line, start)).filter((x) => x.title);
 
   if (!parsed.length) return null;
 
@@ -1330,11 +1307,7 @@ async function listVisibleTeacherTasksForStudent(pool: Pool, studentId: string, 
   return result.rows;
 }
 
-export async function listTodayCheckinTargets(
-  pool: Pool,
-  studentId: string,
-  dateYmd?: string,
-) {
+export async function listTodayCheckinTargets(pool: Pool, studentId: string, dateYmd?: string) {
   const day = dateYmd && /^\d{4}-\d{2}-\d{2}$/.test(dateYmd) ? dateYmd : todayYmd();
   const tasks = await listVisibleTeacherTasksForStudent(pool, studentId, day);
   const plan = await getActivePlan(pool, studentId);
@@ -1431,11 +1404,7 @@ function abbreviateTitle(title: string, max = 5) {
   return `${t.slice(0, max)}…`;
 }
 
-export async function listMonthCheckinCalendar(
-  pool: Pool,
-  studentId: string,
-  yearMonth: string,
-) {
+export async function listMonthCheckinCalendar(pool: Pool, studentId: string, yearMonth: string) {
   const m = yearMonth.match(/^(\d{4})-(\d{2})$/);
   if (!m) return { yearMonth, days: [] as Array<Record<string, unknown>> };
 
@@ -1585,15 +1554,7 @@ export async function submitCheckin(
            ELSE campus_tool_checkin_logs.evidence
          END
        RETURNING id, evidence`,
-      [
-        logId,
-        studentId,
-        day,
-        input.sourceKind,
-        input.sourceId,
-        input.note || '',
-        evidenceJson,
-      ],
+      [logId, studentId, day, input.sourceKind, input.sourceId, input.note || '', evidenceJson],
     );
     return result.rows[0] as { id: string; evidence: unknown };
   } catch {
@@ -1601,11 +1562,7 @@ export async function submitCheckin(
   }
 }
 
-export async function getCheckinLogForStudent(
-  pool: Pool,
-  studentId: string,
-  logId: string,
-) {
+export async function getCheckinLogForStudent(pool: Pool, studentId: string, logId: string) {
   const result = await pool.query(
     `SELECT id, student_id, evidence FROM campus_tool_checkin_logs
       WHERE id = $1 AND student_id = $2`,

@@ -40,6 +40,7 @@ export async function POST(request: Request) {
       if (!topic) return apiError('INVALID_REQUEST', 400, '请填写课题');
       const context = typeof body?.sourceText === 'string' ? body.sourceText.trim() : '';
       const content = await campusToolsChat(
+        session.id,
         '你是高校/中小学教案助手。请用纯中文排版输出教案正文，禁止使用 Markdown：不要出现 #、##、*、**、---、```、- 列表符号。用中文序号（一、二、三）和（1）（2）组织结构。必须包含：标题行、学科年级课时、教学目标、教学重难点、教学过程（导入/新授/练习/小结）、板书设计、课后作业。不要输出无关前言或说明。',
         `课题：${topic}\n学科：${body?.subject || '未指定'}\n年级：${body?.grade || '未指定'}\n课时：${body?.duration || '45分钟'}${context ? `\n课堂内容摘要：\n${context.slice(0, 4000)}` : ''}`,
       );
@@ -54,6 +55,7 @@ export async function POST(request: Request) {
       if (!source) return apiError('INVALID_REQUEST', 400, '请提供知识点或教材文本');
       const count = Math.min(Math.max(Number(body?.count) || 5, 1), 15);
       const raw = await campusToolsChat(
+        session.id,
         '你是出题助手。只返回 JSON：{"title":"...","questions":[{"qtype":"choice|judge|short|open","prompt":"...","options":[],"answer":"...","explanation":"..."}]}。题型规则：1) choice/judge/short 必须是唯一解客观题，可自动判分；2) choice：options 必须 4 项，answer 为完整选项原文之一；3) judge：options 固定 ["对","错"]，answer 只能是「对」或「错」；4) short：唯一解填空/短答（数字、专有名词、固定术语），options=[]，answer 为唯一标准答案（尽量短）；5) open：仅用于开放性表达（如语文理解、论述），无唯一原文答案，options=[]，answer 写「参考要点/评分模板」（分点），explanation 可补充评分说明；6) 题量以 choice/judge/short 为主，open 至多 1～2 题，材料不适合主观题时不要生成 open。不要输出 Markdown。',
         `难度：${body?.difficulty || 'medium'}\n题量：${count}\n材料：\n${source.slice(0, 8000)}`,
         { json: true },
@@ -128,6 +130,7 @@ export async function POST(request: Request) {
       const reference = body?.referenceAnswer?.trim() || '';
       if (!studentAnswer) return apiError('INVALID_REQUEST', 400, '缺少学生作答');
       const raw = await campusToolsChat(
+        session.id,
         '你是开放性简答批改助手。只根据「参考要点/评分模板」评估学生作答（非唯一解题目）。返回 JSON：{"score":0-100,"feedback":"评语与改进建议"}。不要要求与参考原文逐字一致。',
         `评分要点模板：${reference || '观点明确、论据充分、表达清晰'}\n补充标准：${body?.rubric || '正确性、完整性、表达清晰'}\n学生作答：${studentAnswer}`,
         { json: true },
@@ -144,6 +147,7 @@ export async function POST(request: Request) {
         return apiError('FORBIDDEN', 403, '无权限');
       }
       const content = await campusToolsChat(
+        session.id,
         body?.noticeKind === 'minutes'
           ? '你是高校会议纪要助手。根据要点写正式中文纪要，含时间、出席、决议、待办。禁止使用 Markdown（不要 #、**、*、`、- 列表符号等），只输出纯文本，可用中文序号「一、二、」分段。'
           : '你是高校教务通知助手。写简洁正式的通知正文，含事由、对象、时间要求、联系方式占位。禁止使用 Markdown（不要 #、**、*、`、- 列表符号等），只输出纯文本，可用中文序号「一、二、」分段。',
@@ -161,6 +165,7 @@ export async function POST(request: Request) {
       const line = body?.studentLine?.trim() || '';
       if (!line) return apiError('INVALID_REQUEST', 400, '请先输入英文句子');
       const raw = await campusToolsChat(
+        session.id,
         `你是英语口语陪练老师 Lily。场景：${scene}。返回 JSON：{"reply":"英文回复","translation":"中文翻译","score":1-5,"feedback":"简短中文点评"}`,
         `历史：${JSON.stringify(history).slice(0, 3000)}\n学生说：${line}`,
         { json: true },
@@ -182,10 +187,6 @@ export async function POST(request: Request) {
     return apiError('INVALID_REQUEST', 400, `未知 action: ${action}`);
   } catch (error) {
     console.error('[CampusTools] generate failed', error);
-    return apiError(
-      'INTERNAL_ERROR',
-      500,
-      error instanceof Error ? error.message : '生成失败',
-    );
+    return apiError('INTERNAL_ERROR', 500, error instanceof Error ? error.message : '生成失败');
   }
 }
