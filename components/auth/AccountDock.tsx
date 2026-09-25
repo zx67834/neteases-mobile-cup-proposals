@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Settings,
   UserRound,
+  Wrench,
 } from 'lucide-react';
 
 export function AccountDock({
@@ -66,6 +67,13 @@ export function AccountDock({
               站内消息
             </Link>
           ) : null}
+          <Link
+            href="/tools"
+            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition hover:bg-violet-50 hover:text-violet-700 dark:hover:bg-violet-500/10"
+          >
+            <Wrench className="h-4 w-4" />
+            {role === '教师' ? '教师工具' : role === '学生' ? '学生工具' : '行政工具'}
+          </Link>
           <Link
             href="/account"
             className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition hover:bg-violet-50 hover:text-violet-700 dark:hover:bg-violet-500/10"

@@ -128,7 +128,9 @@ const CAMPUS_SCHEMA_STATEMENTS = [
   )`,
   `CREATE INDEX IF NOT EXISTS campus_course_enrollments_student_idx
     ON campus_course_enrollments (student_id) WHERE status = 'active'`,
-  `CREATE OR REPLACE VIEW v_campus_student_courses AS
+  // Postgres CREATE OR REPLACE VIEW cannot rename/reorder columns; drop first.
+  `DROP VIEW IF EXISTS v_campus_student_courses`,
+  `CREATE VIEW v_campus_student_courses AS
     SELECT e.student_id, s.username AS student_username, s.display_name AS student_name,
       e.status AS enrollment_status, e.source AS enrollment_source, e.enrolled_at,
       c.id AS course_id, c.title, c.description, c.status AS course_status,
@@ -138,7 +140,8 @@ const CAMPUS_SCHEMA_STATEMENTS = [
     JOIN campus_courses c ON c.id = e.course_id
     JOIN campus_users s ON s.id = e.student_id
     JOIN campus_users t ON t.id = c.teacher_id`,
-  `CREATE OR REPLACE VIEW v_campus_teacher_courses AS
+  `DROP VIEW IF EXISTS v_campus_teacher_courses`,
+  `CREATE VIEW v_campus_teacher_courses AS
     SELECT c.id AS course_id, c.title, c.description, c.status, c.stage_id, c.class_id,
       c.content_rev, c.teacher_id, u.username AS teacher_username,
       u.display_name AS teacher_name, c.published_at, c.created_at, c.updated_at,
