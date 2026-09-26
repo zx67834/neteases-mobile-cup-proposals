@@ -45,6 +45,7 @@ const ROLE_BLURB: Record<CampusRole, string> = {
 
 const TOOL_ICON: Record<string, typeof Wrench> = {
   'lesson-plan': BookOpen,
+  lessons: BookOpen,
   'quiz-builder': Sparkles,
   grading: ClipboardCheck,
   insights: BarChart3,
@@ -118,6 +119,12 @@ export const TOOLS_BY_ROLE: Record<CampusRole, CampusToolItem[]> = {
       href: '/tools/practice',
     },
     {
+      id: 'lessons',
+      title: '共享教案',
+      description: '查看老师共享的教案',
+      href: '/tools/lessons',
+    },
+    {
       id: 'check-in',
       title: '每日打卡',
       description: '制定学习计划并完成每日打卡',
@@ -170,13 +177,7 @@ export const TOOLS_BY_ROLE: Record<CampusRole, CampusToolItem[]> = {
   ],
 };
 
-export function ToolsCenter({
-  role,
-  displayName,
-}: {
-  role: CampusRole;
-  displayName: string;
-}) {
+export function ToolsCenter({ role, displayName }: { role: CampusRole; displayName: string }) {
   const tools = TOOLS_BY_ROLE[role];
   const homeHref = campusHomeForRole(role);
   const title = ROLE_TITLE[role];
@@ -247,7 +248,9 @@ export function ToolsCenter({
                   </div>
                   <h2 className="mt-4 text-lg font-semibold tracking-tight">{tool.title}</h2>
                   {tool.description ? (
-                    <p className="mt-2 flex-1 text-sm leading-6 text-slate-500">{tool.description}</p>
+                    <p className="mt-2 flex-1 text-sm leading-6 text-slate-500">
+                      {tool.description}
+                    </p>
                   ) : null}
                   <p className="mt-4 text-xs font-semibold text-violet-600 opacity-0 transition group-hover:opacity-100">
                     打开工具 →
