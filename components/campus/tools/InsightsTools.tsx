@@ -663,6 +663,12 @@ export function StudentInsightsTool() {
               >
                 去口语
               </Link>
+              <Link
+                href="/tools/lessons"
+                className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 font-semibold text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/10"
+              >
+                看教案
+              </Link>
             </div>
           </div>
         </div>
@@ -714,12 +720,17 @@ export function StudentInsightsTool() {
           value={stats?.oralCount ? `${Math.round(stats.oralAvg)}` : '—'}
           hint={stats?.oralCount ? `共 ${stats.oralCount} 次练习` : '还没有口语记录'}
         />
-        <StatTile
-          icon={<BookOpen className="h-4 w-4" />}
-          label="共享教案"
-          value={`${stats?.lessonShared ?? 0}`}
-          hint="老师已共享的教案数"
-        />
+        <Link
+          href="/tools/lessons"
+          className="block rounded-2xl border border-slate-100 bg-gradient-to-br from-white to-violet-50/60 p-4 transition hover:border-violet-200 dark:border-white/10 dark:from-slate-900 dark:to-violet-950/20"
+        >
+          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+            <BookOpen className="h-4 w-4 text-violet-600" />
+            共享教案
+          </p>
+          <p className="mt-2 text-2xl font-bold text-violet-700">{stats?.lessonShared ?? 0}</p>
+          <p className="mt-1 text-xs text-violet-600">点击查看老师共享的教案 →</p>
+        </Link>
       </div>
 
       <ToolCard>

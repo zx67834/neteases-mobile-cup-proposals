@@ -45,6 +45,7 @@ const ROLE_BLURB: Record<CampusRole, string> = {
 
 const TOOL_ICON: Record<string, typeof Wrench> = {
   'lesson-plan': BookOpen,
+  lessons: BookOpen,
   'quiz-builder': Sparkles,
   grading: ClipboardCheck,
   insights: BarChart3,
@@ -116,6 +117,12 @@ export const TOOLS_BY_ROLE: Record<CampusRole, CampusToolItem[]> = {
       title: '我的练习',
       description: '完成老师发布的练习卷',
       href: '/tools/practice',
+    },
+    {
+      id: 'lessons',
+      title: '共享教案',
+      description: '查看老师共享的教案',
+      href: '/tools/lessons',
     },
     {
       id: 'check-in',

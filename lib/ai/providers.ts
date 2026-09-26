@@ -2005,6 +2005,14 @@ export const LLM_FETCH_TIMEOUT_MS = 15 * 60 * 1000;
 
 let llmDispatcherPromise: Promise<unknown> | undefined;
 let warnedLlmDispatcherFailure = false;
+let warnedLlmTlsInsecure = false;
+
+/** Dev / campus proxy: allow LLM HTTPS when corporate MITM uses a private CA. */
+function shouldAllowInsecureLlmTls(): boolean {
+  const flag = process.env.LLM_TLS_INSECURE?.trim().toLowerCase();
+  if (flag === '1' || flag === 'true' || flag === 'yes') return true;
+  return process.env.NODE_TLS_REJECT_UNAUTHORIZED === '0';
+}
 
 function getLlmDispatcher(): Promise<unknown> {
   // `??=` caches whatever promise this produces — including a rejected one.
@@ -2012,13 +2020,20 @@ function getLlmDispatcher(): Promise<unknown> {
   // construction) error can't brick every transportFetch call for the life
   // of the worker; the next call retries instead of reusing the rejection.
   llmDispatcherPromise ??= import(/* webpackIgnore: true */ 'undici')
-    .then(
-      ({ Agent }) =>
-        new Agent({
-          headersTimeout: LLM_FETCH_TIMEOUT_MS,
-          bodyTimeout: LLM_FETCH_TIMEOUT_MS,
-        }),
-    )
+    .then(({ Agent }) => {
+      const insecure = shouldAllowInsecureLlmTls();
+      if (insecure && !warnedLlmTlsInsecure) {
+        warnedLlmTlsInsecure = true;
+        log.warn(
+          '[LLM transport] TLS certificate verification disabled (LLM_TLS_INSECURE / NODE_TLS_REJECT_UNAUTHORIZED=0)',
+        );
+      }
+      return new Agent({
+        headersTimeout: LLM_FETCH_TIMEOUT_MS,
+        bodyTimeout: LLM_FETCH_TIMEOUT_MS,
+        ...(insecure ? { connect: { rejectUnauthorized: false } } : {}),
+      });
+    })
     .catch((error: unknown) => {
       llmDispatcherPromise = undefined;
       throw error;

@@ -564,36 +564,136 @@ export async function batchGradeOpenSubmissions(
   };
 }
 
+async function ensureLessonStatusColumn(pool: Pool) {
+  await pool.query(
+    `ALTER TABLE campus_tool_lessons
+       ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'saved'`,
+  );
+}
+
+function isMissingStatusColumnError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return /column ["']?status["']? of relation ["']?campus_tool_lessons["']? does not exist/i.test(
+    message,
+  );
+}
+
 export async function saveLesson(
   pool: Pool,
   teacher: CampusSession,
   input: {
+    id?: string;
     title: string;
     subject: string;
     grade: string;
     duration: string;
     content: string;
     shared?: boolean;
+    status?: 'draft' | 'saved';
     classId?: string | null;
   },
 ) {
+  const status = input.status === 'draft' ? 'draft' : 'saved';
+  const shared = status === 'draft' ? false : Boolean(input.shared);
+
+  // Hot-reload / already-running servers may have skipped the schema migration.
+  try {
+    await ensureLessonStatusColumn(pool);
+  } catch (e) {
+    console.warn('[lessons] ensure status column failed:', e);
+  }
+
+  if (input.id) {
+    try {
+      const result = await pool.query(
+        `UPDATE campus_tool_lessons
+            SET title = $3,
+                subject = $4,
+                grade = $5,
+                duration = $6,
+                content = $7,
+                shared = $8,
+                status = $9,
+                class_id = COALESCE($10, class_id),
+                updated_at = now()
+          WHERE id = $1 AND teacher_id = $2
+          RETURNING id`,
+        [
+          input.id,
+          teacher.id,
+          input.title,
+          input.subject,
+          input.grade,
+          input.duration,
+          input.content,
+          shared,
+          status,
+          input.classId ?? null,
+        ],
+      );
+      if (!result.rowCount) return null;
+      return input.id;
+    } catch (e) {
+      if (!isMissingStatusColumnError(e)) throw e;
+      const result = await pool.query(
+        `UPDATE campus_tool_lessons
+            SET title = $3,
+                subject = $4,
+                grade = $5,
+                duration = $6,
+                content = $7,
+                shared = $8,
+                class_id = COALESCE($9, class_id),
+                updated_at = now()
+          WHERE id = $1 AND teacher_id = $2
+          RETURNING id`,
+        [
+          input.id,
+          teacher.id,
+          input.title,
+          input.subject,
+          input.grade,
+          input.duration,
+          input.content,
+          shared,
+          input.classId ?? null,
+        ],
+      );
+      if (!result.rowCount) return null;
+      return input.id;
+    }
+  }
+
   const lessonId = id('lesson');
-  await pool.query(
-    `INSERT INTO campus_tool_lessons
-       (id, teacher_id, class_id, title, subject, grade, duration, content, shared)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-    [
-      lessonId,
-      teacher.id,
-      input.classId ?? null,
-      input.title,
-      input.subject,
-      input.grade,
-      input.duration,
-      input.content,
-      Boolean(input.shared),
-    ],
-  );
+  const values = [
+    lessonId,
+    teacher.id,
+    input.classId ?? null,
+    input.title,
+    input.subject,
+    input.grade,
+    input.duration,
+    input.content,
+    shared,
+    status,
+  ] as const;
+
+  try {
+    await pool.query(
+      `INSERT INTO campus_tool_lessons
+         (id, teacher_id, class_id, title, subject, grade, duration, content, shared, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      [...values],
+    );
+  } catch (e) {
+    if (!isMissingStatusColumnError(e)) throw e;
+    await pool.query(
+      `INSERT INTO campus_tool_lessons
+         (id, teacher_id, class_id, title, subject, grade, duration, content, shared)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      values.slice(0, 9),
+    );
+  }
   return lessonId;
 }
 
@@ -606,23 +706,49 @@ export async function listLessons(pool: Pool, session: CampusSession) {
     return result.rows;
   }
   if (session.role === 'student') {
+    try {
+      const result = await pool.query(
+        `SELECT l.*, u.display_name AS teacher_name
+           FROM campus_tool_lessons l
+           JOIN campus_users u ON u.id = l.teacher_id
+          WHERE l.shared = TRUE
+            AND coalesce(l.status, 'saved') = 'saved'
+          ORDER BY l.updated_at DESC
+          LIMIT 50`,
+      );
+      return result.rows;
+    } catch (e) {
+      if (!isMissingStatusColumnError(e)) throw e;
+      const result = await pool.query(
+        `SELECT l.*, u.display_name AS teacher_name
+           FROM campus_tool_lessons l
+           JOIN campus_users u ON u.id = l.teacher_id
+          WHERE l.shared = TRUE
+          ORDER BY l.updated_at DESC
+          LIMIT 50`,
+      );
+      return result.rows;
+    }
+  }
+  try {
     const result = await pool.query(
       `SELECT l.*, u.display_name AS teacher_name
          FROM campus_tool_lessons l
          JOIN campus_users u ON u.id = l.teacher_id
-        WHERE l.shared = TRUE
-        ORDER BY l.updated_at DESC
-        LIMIT 50`,
+        WHERE coalesce(l.status, 'saved') = 'saved'
+        ORDER BY l.updated_at DESC LIMIT 100`,
+    );
+    return result.rows;
+  } catch (e) {
+    if (!isMissingStatusColumnError(e)) throw e;
+    const result = await pool.query(
+      `SELECT l.*, u.display_name AS teacher_name
+         FROM campus_tool_lessons l
+         JOIN campus_users u ON u.id = l.teacher_id
+        ORDER BY l.updated_at DESC LIMIT 100`,
     );
     return result.rows;
   }
-  const result = await pool.query(
-    `SELECT l.*, u.display_name AS teacher_name
-       FROM campus_tool_lessons l
-       JOIN campus_users u ON u.id = l.teacher_id
-      ORDER BY l.updated_at DESC LIMIT 100`,
-  );
-  return result.rows;
 }
 
 export async function createNotice(

@@ -182,10 +182,12 @@ export async function POST(request: Request) {
     return apiError('INVALID_REQUEST', 400, `未知 action: ${action}`);
   } catch (error) {
     console.error('[CampusTools] generate failed', error);
-    return apiError(
-      'INTERNAL_ERROR',
-      500,
-      error instanceof Error ? error.message : '生成失败',
-    );
+    const raw = error instanceof Error ? error.message : '生成失败';
+    const message = /self[- ]signed certificate|certificate chain|UNABLE_TO_VERIFY_LEAF_SIGNATURE/i.test(
+      raw,
+    )
+      ? '无法连接模型 API：证书校验失败（常见于公司/校园网 HTTPS 代理）。请在 .env.local 设置 LLM_TLS_INSECURE=true 或 NODE_TLS_REJECT_UNAUTHORIZED=0 后重启服务。'
+      : raw;
+    return apiError('INTERNAL_ERROR', 500, message);
   }
 }

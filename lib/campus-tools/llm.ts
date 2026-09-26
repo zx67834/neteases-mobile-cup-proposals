@@ -47,22 +47,50 @@ async function chatOnce(
   user: string,
   options: { json?: boolean; temperature?: number },
 ): Promise<string> {
-  const response = await fetch(`${provider.baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${provider.apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: provider.model,
-      temperature: options.temperature ?? 0.4,
-      ...(options.json ? { response_format: { type: 'json_object' } } : {}),
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user },
-      ],
-    }),
-  });
+  const insecure =
+    process.env.LLM_TLS_INSECURE?.trim().toLowerCase() === 'true' ||
+    process.env.LLM_TLS_INSECURE?.trim() === '1' ||
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED === '0';
+
+  let response: Response;
+  if (insecure) {
+    const { Agent, fetch: undiciFetch } = await import(/* webpackIgnore: true */ 'undici');
+    const dispatcher = new Agent({ connect: { rejectUnauthorized: false } });
+    response = (await undiciFetch(`${provider.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${provider.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: provider.model,
+        temperature: options.temperature ?? 0.4,
+        ...(options.json ? { response_format: { type: 'json_object' } } : {}),
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+      }),
+      dispatcher,
+    })) as unknown as Response;
+  } else {
+    response = await fetch(`${provider.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${provider.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: provider.model,
+        temperature: options.temperature ?? 0.4,
+        ...(options.json ? { response_format: { type: 'json_object' } } : {}),
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+      }),
+    });
+  }
 
   if (!response.ok) {
     const detail = await response.text().catch(() => '');

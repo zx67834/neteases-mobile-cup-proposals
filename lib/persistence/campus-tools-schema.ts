@@ -89,6 +89,7 @@ const CAMPUS_TOOLS_STATEMENTS = [
     duration TEXT NOT NULL DEFAULT '45分钟',
     content TEXT NOT NULL DEFAULT '',
     shared BOOLEAN NOT NULL DEFAULT FALSE,
+    status TEXT NOT NULL DEFAULT 'saved' CHECK (status IN ('draft', 'saved')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`,
@@ -183,6 +184,16 @@ const CAMPUS_TOOLS_STATEMENTS = [
      ADD COLUMN IF NOT EXISTS schedule_date DATE`,
   `ALTER TABLE campus_tool_checkin_logs
      ADD COLUMN IF NOT EXISTS evidence JSONB NOT NULL DEFAULT '[]'::jsonb`,
+  // Lesson drafts: existing rows default to saved so shared lessons keep showing
+  `ALTER TABLE campus_tool_lessons
+     ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'saved'`,
+  `DO $$ BEGIN
+     ALTER TABLE campus_tool_lessons
+       ADD CONSTRAINT campus_tool_lessons_status_check
+       CHECK (status IN ('draft', 'saved'));
+   EXCEPTION
+     WHEN duplicate_object THEN NULL;
+   END $$`,
 ];
 
 export async function ensureCampusToolsSchema(queryable: Queryable): Promise<void> {
