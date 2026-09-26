@@ -98,7 +98,6 @@ import type { HomeDiscoveryState, useHomeDiscovery } from '@/lib/hooks/use-home-
 import { ProBadge } from '@/components/workbench/ProBadge';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { ThemeToggle } from '@/components/site-header/theme-toggle';
-import { SettingsDialog } from '@/components/settings';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -259,8 +258,6 @@ export function WorkspaceRail({
   const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
   /** The folder whose delete has been asked for, and not yet answered. */
   const [folderToDelete, setFolderToDelete] = useState<{ id: string; name: string } | null>(null);
-  /** The model/provider settings dialog, opened from the rail's foot cluster. */
-  const [settingsOpen, setSettingsOpen] = useState(false);
 
   /**
    * Commit a folder rename. Returns null when it landed and a readable message
@@ -688,7 +685,7 @@ export function WorkspaceRail({
           <button
             type="button"
             data-testid="pro-nav-settings-mini"
-            onClick={() => setSettingsOpen(true)}
+            onClick={() => window.location.assign('/account')}
             aria-label={t('settings.title')}
             title={t('settings.title')}
             className="ws-mini-btn"
@@ -1189,20 +1186,9 @@ export function WorkspaceRail({
         ) : null}
       </div>
 
-      <RailUtilities onOpenSettings={() => setSettingsOpen(true)} />
+      <RailUtilities onOpenSettings={() => window.location.assign('/account')} />
 
       {resizeHandle}
-
-      {/* The model/provider settings dialog — the same component the classic
-          home opens from its header pill. The rail owns the mount so the
-          trigger in the foot cluster stays one component away from its dialog,
-          like the folder-delete question below. */}
-      <SettingsDialog
-        open={settingsOpen}
-        onOpenChange={(next) => {
-          setSettingsOpen(next);
-        }}
-      />
 
       {/* Deleting a folder does something to the courses inside it, so it is
           asked as a question with that consequence stated — not the two-press

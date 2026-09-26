@@ -1262,7 +1262,7 @@
     "conversationSettings": "对话设置",
     "keyboardShortcuts": "键盘快捷键",
     "generalSettings": "常规设置",
-    "systemSettings": "系统设置",
+    "systemSettings": "用量统计",
     "addProvider": "添加",
     "importFromClipboard": "从剪贴板导入",
     "apiSecret": "API 密钥",

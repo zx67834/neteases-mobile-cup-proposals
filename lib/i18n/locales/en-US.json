@@ -1262,7 +1262,7 @@
     "conversationSettings": "Conversation",
     "keyboardShortcuts": "Shortcuts",
     "generalSettings": "General",
-    "systemSettings": "System",
+    "systemSettings": "Usage Statistics",
     "addProvider": "Add",
     "importFromClipboard": "Import from Clipboard",
     "apiSecret": "API Key",

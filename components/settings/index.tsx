@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -29,6 +29,7 @@ import {
   Plus,
   CreditCard,
   Sparkles,
+  UserRound,
 } from 'lucide-react';
 import { useI18n } from '@/lib/hooks/use-i18n';
 import { useSettingsStore } from '@/lib/store/settings';
@@ -58,6 +59,7 @@ import { WebSearchSettings } from './web-search-settings';
 import { WEB_SEARCH_PROVIDERS, getWebSearchProviderDisplayName } from '@/lib/web-search/constants';
 import type { WebSearchProviderId } from '@/lib/web-search/types';
 import { GeneralSettings } from './general-settings';
+import { UsageDashboard } from './usage-dashboard';
 import { SkillSettings } from './skill-settings';
 import { TokenPlanSettings } from './token-plan-settings';
 import { ModelEditDialog } from './model-edit-dialog';
@@ -203,9 +205,28 @@ interface SettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialSection?: SettingsSection;
+  embedded?: boolean;
+  profileContent?: ReactNode;
+  accountModel?: {
+    apiKey: string;
+    modelId: string;
+    hasPersonalKey: boolean;
+    hasAvailableKey: boolean;
+    onApiKeyChange: (apiKey: string) => void;
+    onModelChange: (modelId: string) => void;
+    onSave: () => void;
+    onResetKey: () => void;
+  };
 }
 
-export function SettingsDialog({ open, onOpenChange, initialSection }: SettingsDialogProps) {
+export function SettingsDialog({
+  open,
+  onOpenChange,
+  initialSection,
+  embedded = false,
+  profileContent,
+  accountModel,
+}: SettingsDialogProps) {
   const { t } = useI18n();
 
   // Get settings from store
@@ -233,7 +254,9 @@ export function SettingsDialog({ open, onOpenChange, initialSection }: SettingsD
 
   // Navigation
   const [activeSection, setActiveSection] = useState<SettingsSection>('providers');
-  const [selectedProviderId, setSelectedProviderId] = useState<ProviderId>(providerId);
+  const [selectedProviderId, setSelectedProviderId] = useState<ProviderId>(
+    accountModel ? 'deepseek' : providerId,
+  );
   const [selectedPdfProviderId, setSelectedPdfProviderId] = useState<PDFProviderId>(pdfProviderId);
   const [selectedWebSearchProviderId, setSelectedWebSearchProviderId] =
     useState<WebSearchProviderId>(webSearchProviderId);
@@ -339,6 +362,15 @@ export function SettingsDialog({ open, onOpenChange, initialSection }: SettingsD
   }, [isResizing]);
 
   const handleSave = () => {
+    if (accountModel && activeSection === 'providers' && selectedProviderId === 'deepseek') {
+      accountModel.onSave();
+      return;
+    }
+    if (embedded) {
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+      return;
+    }
     onOpenChange(false);
   };
 
@@ -564,6 +596,8 @@ export function SettingsDialog({ open, onOpenChange, initialSection }: SettingsD
   // Get header content based on section
   const getHeaderContent = () => {
     switch (activeSection) {
+      case 'profile':
+        return <h2 className="text-lg font-semibold">个人资料</h2>;
       case 'general':
         return <h2 className="text-lg font-semibold">{t('settings.systemSettings')}</h2>;
       case 'skills':
@@ -744,357 +778,426 @@ export function SettingsDialog({ open, onOpenChange, initialSection }: SettingsD
     }
   };
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="h-[85vh] p-0 gap-0 block" showCloseButton={false}>
-        <DialogTitle className="sr-only">{t('settings.title')}</DialogTitle>
-        <DialogDescription className="sr-only">{t('settings.description')}</DialogDescription>
-        <div className="flex h-full overflow-hidden">
-          {/* Left Sidebar - Navigation */}
-          <div className="flex-shrink-0 bg-muted/30 p-3 space-y-1" style={{ width: sidebarWidth }}>
-            <button
-              onClick={() => setActiveSection('token-plan')}
-              className={cn(
-                'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left min-w-0',
-                activeSection === 'token-plan'
-                  ? 'bg-primary/10 text-primary font-medium'
-                  : 'hover:bg-muted',
-              )}
-            >
-              <CreditCard className="h-4 w-4 shrink-0" />
-              <span className="truncate">{t('settings.tokenPlan.nav')}</span>
-            </button>
+  const settingsContent = (
+    <div className="flex h-full overflow-hidden">
+      {/* Left Sidebar - Navigation */}
+      <div className="flex-shrink-0 bg-muted/30 p-3 space-y-1" style={{ width: sidebarWidth }}>
+        {profileContent && (
+          <button
+            onClick={() => setActiveSection('profile')}
+            className={cn(
+              'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left min-w-0',
+              activeSection === 'profile'
+                ? 'bg-primary/10 text-primary font-medium'
+                : 'hover:bg-muted',
+            )}
+          >
+            <UserRound className="h-4 w-4 shrink-0" />
+            <span className="truncate">个人资料</span>
+          </button>
+        )}
+        <button
+          onClick={() => setActiveSection('token-plan')}
+          className={cn(
+            'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left min-w-0',
+            activeSection === 'token-plan'
+              ? 'bg-primary/10 text-primary font-medium'
+              : 'hover:bg-muted',
+          )}
+        >
+          <CreditCard className="h-4 w-4 shrink-0" />
+          <span className="truncate">{t('settings.tokenPlan.nav')}</span>
+        </button>
 
-            <button
-              onClick={() => setActiveSection('providers')}
-              className={cn(
-                'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left min-w-0',
-                activeSection === 'providers'
-                  ? 'bg-primary/10 text-primary font-medium'
-                  : 'hover:bg-muted',
-              )}
-            >
-              <Box className="h-4 w-4 shrink-0" />
-              <span className="truncate">{t('settings.providers')}</span>
-            </button>
+        <button
+          onClick={() => setActiveSection('providers')}
+          className={cn(
+            'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left min-w-0',
+            activeSection === 'providers'
+              ? 'bg-primary/10 text-primary font-medium'
+              : 'hover:bg-muted',
+          )}
+        >
+          <Box className="h-4 w-4 shrink-0" />
+          <span className="truncate">{t('settings.providers')}</span>
+        </button>
 
-            <button
-              onClick={() => setActiveSection('image')}
-              className={cn(
-                'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left min-w-0',
-                activeSection === 'image'
-                  ? 'bg-primary/10 text-primary font-medium'
-                  : 'hover:bg-muted',
-              )}
-            >
-              <ImageIcon className="h-4 w-4 shrink-0" />
-              <span className="truncate">{t('settings.imageSettings')}</span>
-            </button>
+        <button
+          onClick={() => setActiveSection('image')}
+          className={cn(
+            'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left min-w-0',
+            activeSection === 'image' ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted',
+          )}
+        >
+          <ImageIcon className="h-4 w-4 shrink-0" />
+          <span className="truncate">{t('settings.imageSettings')}</span>
+        </button>
 
-            <button
-              onClick={() => setActiveSection('video')}
-              className={cn(
-                'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left min-w-0',
-                activeSection === 'video'
-                  ? 'bg-primary/10 text-primary font-medium'
-                  : 'hover:bg-muted',
-              )}
-            >
-              <Film className="h-4 w-4 shrink-0" />
-              <span className="truncate">{t('settings.videoSettings')}</span>
-            </button>
+        <button
+          onClick={() => setActiveSection('video')}
+          className={cn(
+            'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left min-w-0',
+            activeSection === 'video' ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted',
+          )}
+        >
+          <Film className="h-4 w-4 shrink-0" />
+          <span className="truncate">{t('settings.videoSettings')}</span>
+        </button>
 
-            <button
-              onClick={() => setActiveSection('tts')}
-              className={cn(
-                'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left min-w-0',
-                activeSection === 'tts'
-                  ? 'bg-primary/10 text-primary font-medium'
-                  : 'hover:bg-muted',
-              )}
-            >
-              <Volume2 className="h-4 w-4 shrink-0" />
-              <span className="truncate">{t('settings.ttsSettings')}</span>
-            </button>
+        <button
+          onClick={() => setActiveSection('tts')}
+          className={cn(
+            'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left min-w-0',
+            activeSection === 'tts' ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted',
+          )}
+        >
+          <Volume2 className="h-4 w-4 shrink-0" />
+          <span className="truncate">{t('settings.ttsSettings')}</span>
+        </button>
 
-            <button
-              onClick={() => setActiveSection('asr')}
-              className={cn(
-                'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left min-w-0',
-                activeSection === 'asr'
-                  ? 'bg-primary/10 text-primary font-medium'
-                  : 'hover:bg-muted',
-              )}
-            >
-              <Mic className="h-4 w-4 shrink-0" />
-              <span className="truncate">{t('settings.asrSettings')}</span>
-            </button>
+        <button
+          onClick={() => setActiveSection('asr')}
+          className={cn(
+            'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left min-w-0',
+            activeSection === 'asr' ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted',
+          )}
+        >
+          <Mic className="h-4 w-4 shrink-0" />
+          <span className="truncate">{t('settings.asrSettings')}</span>
+        </button>
 
-            <button
-              onClick={() => setActiveSection('pdf')}
-              className={cn(
-                'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left min-w-0',
-                activeSection === 'pdf'
-                  ? 'bg-primary/10 text-primary font-medium'
-                  : 'hover:bg-muted',
-              )}
-            >
-              <FileText className="h-4 w-4 shrink-0" />
-              <span className="truncate">{t('settings.documentParsingSettings')}</span>
-            </button>
+        <button
+          onClick={() => setActiveSection('pdf')}
+          className={cn(
+            'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left min-w-0',
+            activeSection === 'pdf' ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted',
+          )}
+        >
+          <FileText className="h-4 w-4 shrink-0" />
+          <span className="truncate">{t('settings.documentParsingSettings')}</span>
+        </button>
 
-            <button
-              onClick={() => setActiveSection('web-search')}
-              className={cn(
-                'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left min-w-0',
-                activeSection === 'web-search'
-                  ? 'bg-primary/10 text-primary font-medium'
-                  : 'hover:bg-muted',
-              )}
-            >
-              <Search className="h-4 w-4 shrink-0" />
-              <span className="truncate">{t('settings.webSearchSettings')}</span>
-            </button>
+        <button
+          onClick={() => setActiveSection('web-search')}
+          className={cn(
+            'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left min-w-0',
+            activeSection === 'web-search'
+              ? 'bg-primary/10 text-primary font-medium'
+              : 'hover:bg-muted',
+          )}
+        >
+          <Search className="h-4 w-4 shrink-0" />
+          <span className="truncate">{t('settings.webSearchSettings')}</span>
+        </button>
 
-            <button
-              onClick={() => setActiveSection('skills')}
-              className={cn(
-                'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left min-w-0',
-                activeSection === 'skills'
-                  ? 'bg-primary/10 text-primary font-medium'
-                  : 'hover:bg-muted',
-              )}
-            >
-              <Sparkles className="h-4 w-4 shrink-0" />
-              <span className="truncate">{t('settings.skills.nav')}</span>
-            </button>
+        <button
+          onClick={() => setActiveSection('skills')}
+          className={cn(
+            'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left min-w-0',
+            activeSection === 'skills'
+              ? 'bg-primary/10 text-primary font-medium'
+              : 'hover:bg-muted',
+          )}
+        >
+          <Sparkles className="h-4 w-4 shrink-0" />
+          <span className="truncate">{t('settings.skills.nav')}</span>
+        </button>
 
-            <button
-              onClick={() => setActiveSection('general')}
-              className={cn(
-                'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left min-w-0',
-                activeSection === 'general'
-                  ? 'bg-primary/10 text-primary font-medium'
-                  : 'hover:bg-muted',
-              )}
-            >
-              <Settings className="h-4 w-4 shrink-0" />
-              <span className="truncate">{t('settings.systemSettings')}</span>
-            </button>
-          </div>
+        <button
+          onClick={() => setActiveSection('general')}
+          className={cn(
+            'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left min-w-0',
+            activeSection === 'general'
+              ? 'bg-primary/10 text-primary font-medium'
+              : 'hover:bg-muted',
+          )}
+        >
+          <Settings className="h-4 w-4 shrink-0" />
+          <span className="truncate">{t('settings.systemSettings')}</span>
+        </button>
+      </div>
 
-          {/* Sidebar resize handle */}
+      {/* Sidebar resize handle */}
+      <div
+        onMouseDown={(e) => handleResizeStart(e, 'sidebar')}
+        className="flex-shrink-0 w-[5px] cursor-col-resize group flex justify-center"
+      >
+        <div className="w-px h-full bg-border group-hover:bg-primary/50 transition-colors" />
+      </div>
+
+      {/* Middle - Provider List (only shown for provider-based sections) */}
+      {activeSection === 'providers' && (
+        <>
+          <ProviderList
+            providers={allProviders}
+            selectedProviderId={selectedProviderId}
+            onSelect={handleProviderSelect}
+            onAddProvider={() => setShowAddProviderDialog(true)}
+            width={providerListWidth}
+          />
           <div
-            onMouseDown={(e) => handleResizeStart(e, 'sidebar')}
+            onMouseDown={(e) => handleResizeStart(e, 'providerList')}
             className="flex-shrink-0 w-[5px] cursor-col-resize group flex justify-center"
           >
             <div className="w-px h-full bg-border group-hover:bg-primary/50 transition-colors" />
           </div>
+        </>
+      )}
 
-          {/* Middle - Provider List (only shown for provider-based sections) */}
-          {activeSection === 'providers' && (
-            <>
-              <ProviderList
-                providers={allProviders}
-                selectedProviderId={selectedProviderId}
-                onSelect={handleProviderSelect}
-                onAddProvider={() => setShowAddProviderDialog(true)}
-                width={providerListWidth}
-              />
-              <div
-                onMouseDown={(e) => handleResizeStart(e, 'providerList')}
-                className="flex-shrink-0 w-[5px] cursor-col-resize group flex justify-center"
+      {activeSection === 'pdf' && (
+        <>
+          <ProviderListColumn
+            providers={Object.values(PDF_PROVIDERS)}
+            configs={pdfProvidersConfig}
+            selectedId={selectedPdfProviderId}
+            onSelect={setSelectedPdfProviderId}
+            width={providerListWidth}
+            t={t}
+          />
+          <div
+            onMouseDown={(e) => handleResizeStart(e, 'providerList')}
+            className="flex-shrink-0 w-[5px] cursor-col-resize group flex justify-center"
+          >
+            <div className="w-px h-full bg-border group-hover:bg-primary/50 transition-colors" />
+          </div>
+        </>
+      )}
+
+      {activeSection === 'web-search' && (
+        <>
+          <ProviderListColumn
+            providers={Object.values(WEB_SEARCH_PROVIDERS).map((provider) => ({
+              ...provider,
+              name: getWebSearchProviderDisplayName(provider.id, t),
+            }))}
+            configs={webSearchProvidersConfig}
+            selectedId={selectedWebSearchProviderId}
+            onSelect={setSelectedWebSearchProviderId}
+            width={providerListWidth}
+            t={t}
+          />
+          <div
+            onMouseDown={(e) => handleResizeStart(e, 'providerList')}
+            className="flex-shrink-0 w-[5px] cursor-col-resize group flex justify-center"
+          >
+            <div className="w-px h-full bg-border group-hover:bg-primary/50 transition-colors" />
+          </div>
+        </>
+      )}
+
+      {activeSection === 'image' && (
+        <>
+          <ProviderListColumn
+            providers={Object.values(IMAGE_PROVIDERS).map((p) => ({
+              id: p.id,
+              name: t(`settings.${IMAGE_PROVIDER_NAMES[p.id]}`) || p.name,
+              icon: IMAGE_PROVIDER_ICONS[p.id],
+            }))}
+            configs={imageProvidersConfig}
+            selectedId={selectedImageProviderId}
+            onSelect={setSelectedImageProviderId}
+            width={providerListWidth}
+            t={t}
+          />
+          <div
+            onMouseDown={(e) => handleResizeStart(e, 'providerList')}
+            className="flex-shrink-0 w-[5px] cursor-col-resize group flex justify-center"
+          >
+            <div className="w-px h-full bg-border group-hover:bg-primary/50 transition-colors" />
+          </div>
+        </>
+      )}
+
+      {activeSection === 'video' && (
+        <>
+          <ProviderListColumn
+            providers={Object.values(VIDEO_PROVIDERS).map((p) => ({
+              id: p.id,
+              name: t(`settings.${VIDEO_PROVIDER_NAMES[p.id]}`) || p.name,
+              icon: VIDEO_PROVIDER_ICONS[p.id],
+            }))}
+            configs={videoProvidersConfig}
+            selectedId={selectedVideoProviderId}
+            onSelect={setSelectedVideoProviderId}
+            width={providerListWidth}
+            t={t}
+          />
+          <div
+            onMouseDown={(e) => handleResizeStart(e, 'providerList')}
+            className="flex-shrink-0 w-[5px] cursor-col-resize group flex justify-center"
+          >
+            <div className="w-px h-full bg-border group-hover:bg-primary/50 transition-colors" />
+          </div>
+        </>
+      )}
+
+      {activeSection === 'tts' && (
+        <>
+          <ProviderListColumn
+            providers={[
+              ...Object.values(TTS_PROVIDERS).map((p) => ({
+                id: p.id,
+                name: getTTSProviderName(p.id, t),
+                icon: p.icon,
+              })),
+              ...Object.entries(ttsProvidersConfig)
+                .filter(([id]) => isCustomTTSProvider(id))
+                .map(([id, cfg]) => ({
+                  id: id as TTSProviderId,
+                  name: cfg.customName || id,
+                  icon: undefined,
+                })),
+            ]}
+            configs={ttsProvidersConfig}
+            selectedId={ttsProviderId}
+            onSelect={setTTSProvider}
+            width={providerListWidth}
+            t={t}
+            onAdd={() => setShowAddTTSProviderDialog(true)}
+          />
+          <div
+            onMouseDown={(e) => handleResizeStart(e, 'providerList')}
+            className="flex-shrink-0 w-[5px] cursor-col-resize group flex justify-center"
+          >
+            <div className="w-px h-full bg-border group-hover:bg-primary/50 transition-colors" />
+          </div>
+        </>
+      )}
+
+      {activeSection === 'asr' && (
+        <>
+          <ProviderListColumn
+            providers={[
+              ...Object.values(ASR_PROVIDERS).map((p) => ({
+                id: p.id,
+                name: getASRProviderName(p.id, t),
+                icon: p.icon,
+              })),
+              ...Object.entries(asrProvidersConfig)
+                .filter(([id]) => isCustomASRProvider(id))
+                .map(([id, cfg]) => ({
+                  id: id as ASRProviderId,
+                  name: cfg.customName || id,
+                  icon: undefined,
+                })),
+            ]}
+            configs={asrProvidersConfig}
+            selectedId={asrProviderId}
+            onSelect={setASRProvider}
+            width={providerListWidth}
+            t={t}
+            onAdd={() => setShowAddASRProviderDialog(true)}
+          />
+          <div
+            onMouseDown={(e) => handleResizeStart(e, 'providerList')}
+            className="flex-shrink-0 w-[5px] cursor-col-resize group flex justify-center"
+          >
+            <div className="w-px h-full bg-border group-hover:bg-primary/50 transition-colors" />
+          </div>
+        </>
+      )}
+
+      {/* Right - Configuration Panel */}
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 border-b">
+          <div className="flex items-center gap-3">{getHeaderContent()}</div>
+          <div className="flex items-center gap-2">
+            {activeSection === 'providers' && !providersConfig[selectedProviderId]?.isBuiltIn && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-destructive hover:text-destructive"
+                onClick={() => handleDeleteProvider(selectedProviderId)}
               >
-                <div className="w-px h-full bg-border group-hover:bg-primary/50 transition-colors" />
-              </div>
-            </>
-          )}
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+            <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
 
-          {activeSection === 'pdf' && (
-            <>
-              <ProviderListColumn
-                providers={Object.values(PDF_PROVIDERS)}
-                configs={pdfProvidersConfig}
-                selectedId={selectedPdfProviderId}
-                onSelect={setSelectedPdfProviderId}
-                width={providerListWidth}
-                t={t}
-              />
-              <div
-                onMouseDown={(e) => handleResizeStart(e, 'providerList')}
-                className="flex-shrink-0 w-[5px] cursor-col-resize group flex justify-center"
-              >
-                <div className="w-px h-full bg-border group-hover:bg-primary/50 transition-colors" />
-              </div>
-            </>
-          )}
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-5">
+          {activeSection === 'profile' && profileContent}
+          {activeSection === 'general' && (embedded ? <UsageDashboard /> : <GeneralSettings />)}
 
-          {activeSection === 'web-search' && (
-            <>
-              <ProviderListColumn
-                providers={Object.values(WEB_SEARCH_PROVIDERS).map((provider) => ({
-                  ...provider,
-                  name: getWebSearchProviderDisplayName(provider.id, t),
-                }))}
-                configs={webSearchProvidersConfig}
-                selectedId={selectedWebSearchProviderId}
-                onSelect={setSelectedWebSearchProviderId}
-                width={providerListWidth}
-                t={t}
-              />
-              <div
-                onMouseDown={(e) => handleResizeStart(e, 'providerList')}
-                className="flex-shrink-0 w-[5px] cursor-col-resize group flex justify-center"
-              >
-                <div className="w-px h-full bg-border group-hover:bg-primary/50 transition-colors" />
-              </div>
-            </>
-          )}
+          {activeSection === 'skills' && <SkillSettings />}
 
-          {activeSection === 'image' && (
-            <>
-              <ProviderListColumn
-                providers={Object.values(IMAGE_PROVIDERS).map((p) => ({
-                  id: p.id,
-                  name: t(`settings.${IMAGE_PROVIDER_NAMES[p.id]}`) || p.name,
-                  icon: IMAGE_PROVIDER_ICONS[p.id],
-                }))}
-                configs={imageProvidersConfig}
-                selectedId={selectedImageProviderId}
-                onSelect={setSelectedImageProviderId}
-                width={providerListWidth}
-                t={t}
-              />
-              <div
-                onMouseDown={(e) => handleResizeStart(e, 'providerList')}
-                className="flex-shrink-0 w-[5px] cursor-col-resize group flex justify-center"
-              >
-                <div className="w-px h-full bg-border group-hover:bg-primary/50 transition-colors" />
-              </div>
-            </>
-          )}
+          {activeSection === 'token-plan' && <TokenPlanSettings />}
 
-          {activeSection === 'video' && (
-            <>
-              <ProviderListColumn
-                providers={Object.values(VIDEO_PROVIDERS).map((p) => ({
-                  id: p.id,
-                  name: t(`settings.${VIDEO_PROVIDER_NAMES[p.id]}`) || p.name,
-                  icon: VIDEO_PROVIDER_ICONS[p.id],
-                }))}
-                configs={videoProvidersConfig}
-                selectedId={selectedVideoProviderId}
-                onSelect={setSelectedVideoProviderId}
-                width={providerListWidth}
-                t={t}
-              />
-              <div
-                onMouseDown={(e) => handleResizeStart(e, 'providerList')}
-                className="flex-shrink-0 w-[5px] cursor-col-resize group flex justify-center"
-              >
-                <div className="w-px h-full bg-border group-hover:bg-primary/50 transition-colors" />
-              </div>
-            </>
-          )}
+          {activeSection === 'providers' &&
+            selectedProvider &&
+            accountModel &&
+            selectedProviderId === 'deepseek' && (
+              <>
+                <p className="mb-5 rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-700 dark:bg-blue-500/10 dark:text-blue-200">
+                  {accountModel.hasPersonalKey
+                    ? '当前使用你独立保存的 API Key。'
+                    : accountModel.hasAvailableKey
+                      ? '当前使用服务器的实验测试 Key。'
+                      : '目前尚无可用 Key，请填入你自己的 Key。'}
+                </p>
+                <ProviderConfigPanel
+                  provider={{
+                    ...PROVIDERS.deepseek,
+                    models: PROVIDERS.deepseek.models.filter((model) =>
+                      ['deepseek-flash', 'deepseek-v4-pro'].includes(model.id),
+                    ),
+                  }}
+                  initialApiKey={accountModel.apiKey}
+                  initialBaseUrl=""
+                  initialRequiresApiKey
+                  providersConfig={{
+                    ...providersConfig,
+                    deepseek: {
+                      ...providersConfig.deepseek,
+                      isServerConfigured: false,
+                      models: PROVIDERS.deepseek.models.filter((model) =>
+                        ['deepseek-flash', 'deepseek-v4-pro'].includes(model.id),
+                      ),
+                    },
+                  }}
+                  onConfigChange={accountModel.onApiKeyChange}
+                  onSave={() => undefined}
+                  onEditModel={() => undefined}
+                  onDeleteModel={() => undefined}
+                  onAddModel={() => undefined}
+                  isBuiltIn
+                  verifyEndpoint="/api/auth/account/verify-model"
+                  hasStoredApiKey={accountModel.hasPersonalKey}
+                  hasAvailableApiKey={accountModel.hasAvailableKey}
+                  selectedModelId={accountModel.modelId}
+                  onSelectModel={accountModel.onModelChange}
+                  modelsReadOnly
+                  showBaseUrl={false}
+                  showRequiresApiKeyToggle={false}
+                />
+                {accountModel.hasPersonalKey && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-5"
+                    onClick={accountModel.onResetKey}
+                  >
+                    改用测试 Key
+                  </Button>
+                )}
+              </>
+            )}
 
-          {activeSection === 'tts' && (
-            <>
-              <ProviderListColumn
-                providers={[
-                  ...Object.values(TTS_PROVIDERS).map((p) => ({
-                    id: p.id,
-                    name: getTTSProviderName(p.id, t),
-                    icon: p.icon,
-                  })),
-                  ...Object.entries(ttsProvidersConfig)
-                    .filter(([id]) => isCustomTTSProvider(id))
-                    .map(([id, cfg]) => ({
-                      id: id as TTSProviderId,
-                      name: cfg.customName || id,
-                      icon: undefined,
-                    })),
-                ]}
-                configs={ttsProvidersConfig}
-                selectedId={ttsProviderId}
-                onSelect={setTTSProvider}
-                width={providerListWidth}
-                t={t}
-                onAdd={() => setShowAddTTSProviderDialog(true)}
-              />
-              <div
-                onMouseDown={(e) => handleResizeStart(e, 'providerList')}
-                className="flex-shrink-0 w-[5px] cursor-col-resize group flex justify-center"
-              >
-                <div className="w-px h-full bg-border group-hover:bg-primary/50 transition-colors" />
-              </div>
-            </>
-          )}
-
-          {activeSection === 'asr' && (
-            <>
-              <ProviderListColumn
-                providers={[
-                  ...Object.values(ASR_PROVIDERS).map((p) => ({
-                    id: p.id,
-                    name: getASRProviderName(p.id, t),
-                    icon: p.icon,
-                  })),
-                  ...Object.entries(asrProvidersConfig)
-                    .filter(([id]) => isCustomASRProvider(id))
-                    .map(([id, cfg]) => ({
-                      id: id as ASRProviderId,
-                      name: cfg.customName || id,
-                      icon: undefined,
-                    })),
-                ]}
-                configs={asrProvidersConfig}
-                selectedId={asrProviderId}
-                onSelect={setASRProvider}
-                width={providerListWidth}
-                t={t}
-                onAdd={() => setShowAddASRProviderDialog(true)}
-              />
-              <div
-                onMouseDown={(e) => handleResizeStart(e, 'providerList')}
-                className="flex-shrink-0 w-[5px] cursor-col-resize group flex justify-center"
-              >
-                <div className="w-px h-full bg-border group-hover:bg-primary/50 transition-colors" />
-              </div>
-            </>
-          )}
-
-          {/* Right - Configuration Panel */}
-          <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-            {/* Header */}
-            <div className="flex items-center justify-between p-5 border-b">
-              <div className="flex items-center gap-3">{getHeaderContent()}</div>
-              <div className="flex items-center gap-2">
-                {activeSection === 'providers' &&
-                  !providersConfig[selectedProviderId]?.isBuiltIn && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-destructive hover:text-destructive"
-                      onClick={() => handleDeleteProvider(selectedProviderId)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto p-5">
-              {activeSection === 'general' && <GeneralSettings />}
-
-              {activeSection === 'skills' && <SkillSettings />}
-
-              {activeSection === 'token-plan' && <TokenPlanSettings />}
-
-              {activeSection === 'providers' && selectedProvider && (
+          {activeSection === 'providers' &&
+            selectedProvider &&
+            (!accountModel || selectedProviderId !== 'deepseek') && (
+              <>
+                {accountModel && (
+                  <p className="mb-5 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
+                    此服务商沿用 OpenMAIC 本地配置；当前教师课程与学生答疑仍使用账号绑定的 DeepSeek
+                    模型。
+                  </p>
+                )}
                 <ProviderConfigPanel
                   provider={selectedProvider}
                   initialApiKey={providersConfig[selectedProviderId]?.apiKey || ''}
@@ -1115,48 +1218,65 @@ export function SettingsDialog({ open, onOpenChange, initialSection }: SettingsD
                   onResetToDefault={() => handleResetProvider(selectedProviderId)}
                   isBuiltIn={providersConfig[selectedProviderId]?.isBuiltIn ?? true}
                 />
-              )}
+              </>
+            )}
 
-              {activeSection === 'pdf' && (
-                <PDFSettings selectedProviderId={selectedPdfProviderId} />
-              )}
-              {activeSection === 'web-search' && (
-                <WebSearchSettings selectedProviderId={selectedWebSearchProviderId} />
-              )}
-              {activeSection === 'image' && (
-                <ImageSettings selectedProviderId={selectedImageProviderId} />
-              )}
-              {activeSection === 'video' && (
-                <VideoSettings selectedProviderId={selectedVideoProviderId} />
-              )}
-              {activeSection === 'tts' && <TTSSettings selectedProviderId={ttsProviderId} />}
-              {activeSection === 'asr' && <ASRSettings selectedProviderId={asrProviderId} />}
-            </div>
-
-            {/* Footer */}
-            <div className="flex items-center justify-end gap-3 px-5 py-3 border-t bg-muted/30">
-              {saveStatus === 'saved' && (
-                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <CheckCircle2 className="h-4 w-4" />
-                  <span>{t('settings.saveSuccess')}</span>
-                </div>
-              )}
-              {saveStatus === 'error' && (
-                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <XCircle className="h-4 w-4" />
-                  <span>{t('settings.saveFailed')}</span>
-                </div>
-              )}
-              <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
-                {t('settings.close')}
-              </Button>
-              <Button size="sm" onClick={handleSave}>
-                {t('settings.save')}
-              </Button>
-            </div>
-          </div>
+          {activeSection === 'pdf' && <PDFSettings selectedProviderId={selectedPdfProviderId} />}
+          {activeSection === 'web-search' && (
+            <WebSearchSettings selectedProviderId={selectedWebSearchProviderId} />
+          )}
+          {activeSection === 'image' && (
+            <ImageSettings selectedProviderId={selectedImageProviderId} />
+          )}
+          {activeSection === 'video' && (
+            <VideoSettings selectedProviderId={selectedVideoProviderId} />
+          )}
+          {activeSection === 'tts' && <TTSSettings selectedProviderId={ttsProviderId} />}
+          {activeSection === 'asr' && <ASRSettings selectedProviderId={asrProviderId} />}
         </div>
-      </DialogContent>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 px-5 py-3 border-t bg-muted/30">
+          {saveStatus === 'saved' && (
+            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <CheckCircle2 className="h-4 w-4" />
+              <span>{t('settings.saveSuccess')}</span>
+            </div>
+          )}
+          {saveStatus === 'error' && (
+            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <XCircle className="h-4 w-4" />
+              <span>{t('settings.saveFailed')}</span>
+            </div>
+          )}
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+            {t('settings.close')}
+          </Button>
+          {activeSection !== 'profile' && activeSection !== 'general' && (
+            <Button size="sm" onClick={handleSave}>
+              {t('settings.save')}
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      {embedded ? (
+        <div className="h-[min(85vh,860px)] min-h-[640px] overflow-hidden rounded-3xl border bg-background shadow-sm">
+          {settingsContent}
+        </div>
+      ) : (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+          <DialogContent className="h-[85vh] p-0 gap-0 block" showCloseButton={false}>
+            <DialogTitle className="sr-only">{t('settings.title')}</DialogTitle>
+            <DialogDescription className="sr-only">{t('settings.description')}</DialogDescription>
+            {settingsContent}
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Edit Model Dialog */}
       <ModelEditDialog
@@ -1215,6 +1335,6 @@ export function SettingsDialog({ open, onOpenChange, initialSection }: SettingsD
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Dialog>
+    </>
   );
 }

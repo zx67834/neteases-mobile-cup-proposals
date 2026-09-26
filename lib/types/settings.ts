@@ -1,6 +1,7 @@
 import type { ProviderId, ModelInfo, ProviderType } from '@/lib/types/provider';
 
 export type SettingsSection =
+  | 'profile'
   | 'general'
   | 'token-plan'
   | 'providers'
